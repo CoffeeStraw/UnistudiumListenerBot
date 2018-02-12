@@ -25,6 +25,8 @@ from settings import *
 # Current state of the user
 user_state = {}
 
+r = requests.Session()
+
 # Function to handle incoming messages
 def handle(msg):
 
@@ -52,30 +54,34 @@ def handle(msg):
     print("Msg from {}@{}{}[{}]: \t\"{}{}{}\"".format(color.BOLD, username, color.END, str(chat_id), color.ITALIC, cmd_input, color.END))
 
     if cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
-        print(color.CYAN + "Tentativo di connessione con |" + cred_get("username") + " - " + cred_get("password") + "|" + color.END)
-        if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
-            # Tries to connect to the unistudium website
-            payload = {
-                "username": cred_get("username"),
-                "password": cred_get("password")
-            }
+        print(color.CYAN + "Tentativo di connessione con |" + cred_get("username") + " - ******** |" + color.END)
 
-            r = requests.post(LOGIN_URL, data=payload)
-
-            try:
-                pattern = "<span class=\"usertext\">(.+?)</span>"
-                name = re.findall(pattern, str(r.content))[0]
-                print(color.CYAN + "Connessione instaurata con successo!" + color.END)
-                bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "!*", parse_mode = "Markdown")
-            except:
-                print(color.RED + "Credenziali errate" + color.END)
-                bot.sendMessage(chat_id, "Login errato, ritenta sostituendo le credenziali nel file _cred.json_.", parse_mode = "Markdown")
-        else:
-            print(color.RED + "Credenziali non settate" + color.END)
-            bot.sendMessage(chat_id, "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova.", parse_mode = "Markdown")
+        if reconnect(chat_id):
+            main_page = r.get(MAIN_URL)
+            pattern = "<span class=\"usertext\">(.+?)</span>"
+            name = re.findall(pattern, str(main_page.content))[0]
+            bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "!*", parse_mode = "Markdown")
 
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
-        bot.sendMessage(chat_id, "1) _Work in Progress..._", parse_mode = "Markdown")
+        main_page = r.get(MAIN_URL)
+
+        pattern = "<h3 class=\"coursename\">(.+?)</h3>"
+        courses_html = re.findall(pattern, str(main_page.content))
+
+        courses = []
+        for course_html in courses_html:
+            name_pattern = "<\w+.*?>(.+?)<\/a>"
+            url_pattern  = "href=\"(.+?)\""
+            courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
+
+        # List courses
+        courses_string = ""
+        for course in courses:
+            for el in course:
+                courses_string += el + "\n"
+            courses_string += "\n"
+
+        bot.sendMessage(chat_id, "Ecco tutte le materie che stai seguendo:\n" + courses_string, parse_mode = "Markdown")
 
     elif cmd_input == "/stop_listen" or cmd_input == "/stop_listen"+bot_name:
         bot.sendMessage(chat_id, "2) _Work in Progress..._", parse_mode = "Markdown")
@@ -83,6 +89,37 @@ def handle(msg):
     elif basics_cmds_response(chat_id, cmd_input) == 0 and '/' in cmd_input:
         bot.sendMessage(chat_id, "Il comando inserito non è valido.")
 
+# Tries to connect to the unistudium website
+def reconnect(chat_id):
+    if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
+        main_cont = str(r.get(MAIN_URL).content)
+        if "loginpanel" in main_cont:
+            payload = {
+                "username": cred_get("username"),
+                "password": cred_get("password")
+            }
+
+            # Obtaining cookie
+            r.get(LOGIN_URL)
+            # Trying login
+            r.post(LOGIN_URL, data=payload)
+
+            main_cont = str(r.get(MAIN_URL).content)
+
+            if("loginpanel" in main_cont):
+                print(color.RED + "Credenziali errate" + color.END)
+                bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _cred.json_.", parse_mode = "Markdown")
+            else:
+                print(color.GREEN + "Connesso al portale UNISTUDIUM" + color.END)
+                return 1
+        else:
+            print(color.YELLOW + "Sei già connesso" + color.END)
+            bot.sendMessage(chat_id, "Sei già connesso al portale.", parse_mode = "Markdown")
+            return 2
+    else:
+        print(color.RED + "Credenziali non settate" + color.END)
+        bot.sendMessage(chat_id, "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova.", parse_mode = "Markdown")
+    return 0
 
 # Managing callback query from callback buttons in inline keyboards
 def on_callback_query(msg):
