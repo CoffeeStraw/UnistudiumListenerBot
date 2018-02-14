@@ -8,6 +8,7 @@ TO DO:
 - Comando per aggiungere tra i corsi di studio seguiti quelli desiderati        [V]
 - Comando per rimuovere  tra i corsi di studio seguiti quelli desiderati        [V]
     - Invio di un messaggio contenente il nuovo aggiornamento                   [ ]
+- Migliorare gestione liste (in courses_followed salva urls)                    [ ]
 '''
 #!/usr/bin/python3.6
 import os
@@ -15,6 +16,7 @@ import sys
 import time
 import json
 import pickle
+import html
 
 import requests
 import re
@@ -27,7 +29,7 @@ from settings import *
 # Current state of the user
 user_state = {}
 
-r = requests.Session()
+current_session = requests.Session()
 
 # Function to handle incoming messages
 def handle(msg):
@@ -56,12 +58,13 @@ def handle(msg):
 
     if basics_cmds_response(chat_id, cmd_input) != 0:
         pass
+    #---------------------------------------------------------------------------
     elif cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
         print(color.CYAN + "[CONNECTION] Tentativo di connessione con |" + cred_get("username") + " - ********|" + color.END)
 
         rec_response = reconnect(chat_id)
         if rec_response == 1:
-            main_page = r.get(MAIN_URL)
+            main_page = current_session.get(MAIN_URL)
             pattern = "<span class=\"usertext\">(.+?)</span>"
             name = re.findall(pattern, str(main_page.content))[0]
             bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "!*", parse_mode = "Markdown")
@@ -69,31 +72,10 @@ def handle(msg):
             bot.sendMessage(chat_id, "Sei già connesso al portale", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
             bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _creSei già connessod.json_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-
-
+    #---------------------------------------------------------------------------
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
-        courses_names = []
-        if not os.path.isfile(fileDir + "full_courses.txt"):
-            if reconnect(chat_id):
-                print(color.CYAN + "[FILE CREATE] Aggiunto file full_courses.txt" + color.END)
-                main_page = r.get(MAIN_URL)
-
-                pattern = "<h3 class=\"coursename\">(.+?)</h3>"
-                courses_html = re.findall(pattern, str(main_page.content))
-
-                courses = []
-                for course_html in courses_html:
-                    name_pattern = "<\w+.*?>(.+?)<\/a>"
-                    url_pattern  = "href=\"(.+?)\""
-                    courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
-
-                with open(fileDir + "full_courses.txt", 'wb') as f:
-                    pickle.dump(courses, f)
-
-                for course in courses:
-                    courses_names.append(course[0])
-        else:
-            courses_names = load_courses_names(fileDir + "full_courses.txt")
+        download_courses(chat_id, fileDir + "full_courses.txt")
+        courses_names = load_courses(fileDir + "full_courses.txt", "names")
 
         # List courses
         keyboard_courses = []
@@ -105,39 +87,34 @@ def handle(msg):
         user_state[chat_id] = 1
 
     elif user_state[chat_id] == 1:
-        courses_names = load_courses_names(fileDir + "full_courses.txt")
+        courses_names = load_courses(fileDir + "full_courses.txt", "names")
         if cmd_input in courses_names:
-            courses_followed = []
             if not os.path.isfile(fileDir + "courses_followed.txt"):
                 print(color.CYAN + "[FILE CREATE] Aggiunto file courses_followed.txt" + color.END)
 
-                courses_followed.append(cmd_input)
-                with open(fileDir + "courses_followed.txt", 'wb') as f:
-                    pickle.dump(courses_followed, f)
+                writelist_infile([cmd_input], fileDir + "courses_followed.txt")
 
-                bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "* 🔔", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             else:
-                with open (fileDir + "courses_followed.txt", 'rb') as f:
-                    courses_followed = pickle.load(f)
+                courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
 
                 if cmd_input not in courses_followed:
                     courses_followed.append(cmd_input)
-                    with open(fileDir + "courses_followed.txt", 'wb') as f:
-                        pickle.dump(courses_followed, f)
+                    writelist_infile(courses_followed, fileDir + "courses_followed.txt")
 
-                    bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "* 🔔", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                    bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 else:
                     bot.sendMessage(chat_id, "Stai già seguendo il corso scelto.\n\nPuoi smettere di seguirlo con il comando /stop_listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
             user_state[chat_id] = 0
         else:
             bot.sendMessage(chat_id, "Il corso scritto non è presente tra quelli trovati, riprova")
-
+    #---------------------------------------------------------------------------
     elif cmd_input == "/stop_listen" or cmd_input == "/stop_listen"+bot_name:
         if not os.path.isfile(fileDir + "courses_followed.txt"):
             bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
-            courses_followed = load_courses_followed(fileDir + "courses_followed.txt")
+            courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
 
             keyboard_courses = []
             for course_followed in courses_followed:
@@ -148,25 +125,61 @@ def handle(msg):
             user_state[chat_id] = 2
 
     elif user_state[chat_id] == 2:
-        courses_followed = load_courses_followed(fileDir + "courses_followed.txt")
+        courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
         if cmd_input in courses_followed:
             courses_followed.remove(cmd_input)
-
             if courses_followed:
-                with open(fileDir + "courses_followed.txt", 'wb') as f:
-                    pickle.dump(courses_followed, f)
+                writelist_infile(courses_followed, fileDir + "courses_followed.txt")
             else:
                 print(color.CYAN + "[FILE DELETE] Rimosso file courses_followed.txt" + color.END)
                 os.remove(fileDir + "courses_followed.txt")
 
-            bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "* 🔕", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            user_state[chat_id] = 0
+        else:
+            bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
+    #---------------------------------------------------------------------------
+    elif cmd_input == "/viewfiles" or cmd_input == "/viewfiles"+bot_name:
+        if not os.path.isfile(fileDir + "courses_followed.txt"):
+            bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        else:
+            courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
+
+            keyboard_courses = []
+            for course_followed in courses_followed:
+                keyboard_courses.append([course_followed])
+
+            markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
+            bot.sendMessage(chat_id, "Seleziona il corso di cui vuoi vedere i files caricati", parse_mode = "Markdown", reply_markup = markup)
+            user_state[chat_id] = 3
+
+    elif user_state[chat_id] == 3:
+        courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
+        if cmd_input in courses_followed:
+            courses = load_courses(fileDir + "full_courses.txt")
+            files_url = ""
+            for course in courses:
+                if cmd_input == course[0]:
+                    files_url = course[1]
+                    break
+
+            final_list = download_updated_files(chat_id, files_url)
+            mex = ""
+            for sec in final_list:
+                mex += "Nelle sezione *" + sec[0] + "*:\n"
+                for file_downloaded in sec[1]:
+                    mex += "TIPO: " + file_downloaded[0] + "\n"
+                    mex += "NOME: " + file_downloaded[1] + "\n"
+                    mex += "URL:  " + file_downloaded[2] + "\n"
+                mex += "\n\n"
+
+            bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id] = 0
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
 
-
     elif cmd_input.startswith("/"):
-        bot.sendMessage(chat_id, "Il comando inserito non è valido.")
+        bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
 
 # Tries to connect to the unistudium website
 def reconnect(chat_id):
@@ -177,7 +190,7 @@ def reconnect(chat_id):
     if response:
         if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
 
-            main_cont = str(r.get(MAIN_URL).content)
+            main_cont = str(current_session.get(MAIN_URL).content)
             if "loginpanel" in main_cont:
                 payload = {
                     "username": cred_get("username"),
@@ -185,11 +198,11 @@ def reconnect(chat_id):
                 }
 
                 # Obtaining cookie
-                r.get(LOGIN_URL)
+                current_session.get(LOGIN_URL)
                 # Trying login
-                r.post(LOGIN_URL, data=payload)
+                current_session.post(LOGIN_URL, data=payload)
 
-                main_cont = str(r.get(MAIN_URL).content)
+                main_cont = str(current_session.get(MAIN_URL).content)
 
                 if("loginpanel" in main_cont):
                     print(color.RED + "[CONNECTION] Credenziali errate" + color.END)
@@ -226,40 +239,86 @@ def basics_cmds_response(chat_id, cmd_input):
 
     elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [dict(text = 'Dona', url = 'https://google.it'), dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]])
+            [dict(text = 'Dona', url = 'https://google.it'),
+             dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
+            ])
         bot.sendMessage(chat_id, info_msg,  parse_mode = "Markdown", reply_markup = keyboard)
         return 1
 
     else:
         return 0
 
-def load_courses(path):
-    course = []
-    with open (path, 'rb') as f:
-        courses = pickle.load(f)
+# Function to download courses from Unistudium if not present
+def download_courses(chat_id, path):
+    if not os.path.isfile(fileDir + "full_courses.txt"):
+        if reconnect(chat_id):
+            main_page = current_session.get(MAIN_URL)
 
-    return courses
+            pattern = "<h3 class=\"coursename\">(.+?)</h3>"
+            courses_html = re.findall(pattern, str(main_page.content))
 
-def load_courses_names(path):
-    courses_names = []
-    for course in load_courses(path):
-        courses_names.append(course[0])
+            courses = []
+            for course_html in courses_html:
+                name_pattern = "<\w+.*?>(.+?)<\/a>"
+                url_pattern  = "href=\"(.+?)\""
+                courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
 
-    return courses_names
+            writelist_infile(courses, fileDir + "full_courses.txt")
+            print(color.CYAN + "[FILE CREATE] Aggiunto file full_courses.txt" + color.END)
 
-def load_courses_urls(path):
-    courses_urls = []
-    for course in load_courses(path):
-        courses_urls.append(course[1])
+def download_updated_files(chat_id, files_url):
+    if reconnect(chat_id):
+        course_page = current_session.get(files_url)
 
-    return courses_urls
+        pattern = "<li id=\"section-[^0]\"(.+?)<\/ul><\/div><\/li>"
+        sections = re.findall(pattern, str(course_page.content))
 
-def load_courses_followed(path):
-    courses_followed = []
-    with open (path, 'rb') as f:
-        courses_followed = pickle.load(f)
+        final_list = []
+        for i, section in enumerate(sections):
+            pattern = "<h3 class=\"sectionname\">(.+?)</h3>"
+            section_name = re.findall(pattern, str(section))[0]
 
-    return courses_followed
+            final_list.append([section_name, []])
+
+            pattern = "<div class=\"activityinstance\">(.+?)<\/div>"
+            files_html = re.findall(pattern, str(section))
+
+            for file_html in files_html:
+                pattern = "<a class=\"\" onclick=\"\" href=\"(.+?)\""
+                file_link = re.findall(pattern, str(file_html))[0]
+
+                pattern = "<span class=\"instancename\">(.+?)</span>"
+                file_name_and_type = re.findall(pattern, str(file_html))[0]
+
+                pattern = "(.+?)<span class=\"accesshide \" >"
+                file_name = re.findall(pattern, str(file_name_and_type))[0]
+
+                pattern = "<span class=\"accesshide \" > (.+)"
+                file_type = re.findall(pattern, str(file_name_and_type))[0]
+
+                final_list[i][1].append([file_type, file_name, file_link])
+
+        return final_list
+    return [] # Error
+
+# courses_wanted can be "urls" or "names"
+def load_courses(path, name_or_url = ""):
+    courses_wanted = []
+    for course in loadlist_fromfile(path):
+        if name_or_url == "names":
+            courses_wanted.append(course[0])
+        elif name_or_url == "urls":
+            courses_wanted.append(course[1])
+        else:
+            courses_wanted.append(course)
+
+    return courses_wanted
+
+def loadlist_fromfile(path):
+    return pickle.load(open(path, 'rb'))
+
+def writelist_infile(my_list, path):
+    pickle.dump(my_list, open(path, 'wb'))
 
 def cred_get(field):
     data = json.load(open('cred.json'))
@@ -272,7 +331,7 @@ pid = str(os.getpid())
 
 # Check if PID exist
 if os.path.isfile(pidfile):
-    print(("{}[EXIT] {} Il processo è ancora attivo{}").format(color.RED, pidfile, color.END))
+    print(("{}[EXIT] Il processo {} è ancora attivo (usa fg per riaprirlo){}").format(color.RED, pidfile, color.END))
     sys.exit()
 else:
     f = open(pidfile, 'w')
