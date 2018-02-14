@@ -13,6 +13,8 @@ cmd_list  = "Questa è una lista degli attuali comandi presenti nel bot:\n\n"\
 
 info_msg  = "*UnistudiumListener* è il miglior metodo per tenerti sempre aggiornato sugli ultimi argomenti caricati dai docenti su *Unistudium*.\n\nSe questo bot ti piace, offrimi una birra!"
 
+fileDir = "/home/antonio/Scrivania/Antonio/UnistudiumListenerBot/Files/"
+
 LOGIN_URL = "https://www.unistudium.unipg.it/unistudium/login/index.php"
 MAIN_URL  = "https://www.unistudium.unipg.it/unistudium/"
 
