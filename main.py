@@ -8,7 +8,8 @@ TO DO:
 - Comando per aggiungere tra i corsi di studio seguiti quelli desiderati        [V]
 - Comando per rimuovere  tra i corsi di studio seguiti quelli desiderati        [V]
     - Invio di un messaggio contenente il nuovo aggiornamento                   [ ]
-- Migliorare gestione liste (in courses_followed salva urls)                    [ ]
+- Migliorare gestione liste (in courses_followed salva urls)                    [V]
+- Migliorare invio lista files (max 4096 UTF8 characters)                       [ ]
 '''
 #!/usr/bin/python3.6
 import os
@@ -57,142 +58,167 @@ def handle(msg):
 
     if basics_cmds_response(chat_id, cmd_input) != 0:
         pass
-    #---------------------------------------------------------------------------
+    ############################################################################
     elif cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
         print(color.CYAN + "[CONNECTION] Tentativo di connessione con |" + cred_get("username") + " - ********|" + color.END)
 
         rec_response = reconnect(chat_id)
         if rec_response == 1:
             main_page = current_session.get(MAIN_URL)
+
             pattern = "<span class=\"usertext\">(.+?)</span>"
             name = re.findall(pattern, str(main_page.content))[0]
-            bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "!*", parse_mode = "Markdown")
+
+            bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "*!", parse_mode = "Markdown")
         elif rec_response == 2:
             bot.sendMessage(chat_id, "Sei già connesso al portale", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
-            bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _creSei già connessod.json_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-    #---------------------------------------------------------------------------
+            bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _cred.json_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+    ############################################################################
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
-        download_courses(chat_id, fileDir + "full_courses.txt")
-        courses_names = load_courses(fileDir + "full_courses.txt", "names")
+        if not os.path.isfile(coursesFile):
+            if reconnect(chat_id):
+                dl_courses_list(coursesFile)
 
         # List courses
         keyboard_courses = []
-        for course_name in courses_names:
-            keyboard_courses.append([course_name])
+        for course_x in getlist_fromfile(coursesFile):
+            keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
         bot.sendMessage(chat_id, "Seleziona il corso che vuoi che ascolti per te", parse_mode = "Markdown", reply_markup = markup)
         user_state[chat_id] = 1
 
     elif user_state[chat_id] == 1:
-        courses_names = load_courses(fileDir + "full_courses.txt", "names")
-        if cmd_input in courses_names:
-            if not os.path.isfile(fileDir + "courses_followed.txt"):
-                print(color.CYAN + "[FILE CREATE] Aggiunto file courses_followed.txt" + color.END)
-
-                writelist_infile([cmd_input], fileDir + "courses_followed.txt")
-
-                bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            else:
-                courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
-
-                if cmd_input not in courses_followed:
-                    courses_followed.append(cmd_input)
-                    writelist_infile(courses_followed, fileDir + "courses_followed.txt")
-
+        for course_x in getlist_fromfile(coursesFile):
+            if cmd_input == course_x[0]:
+                if not os.path.isfile(coursesFollowedFile):
+                    writelist_infile(coursesFollowedFile, [course_x])
+                    print(color.CYAN + "[FILE CREATE] Aggiunto file courses_followed.txt" + color.END)
                     bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 else:
-                    bot.sendMessage(chat_id, "Stai già seguendo il corso scelto.\n\nPuoi smettere di seguirlo con il comando /stop_listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                    courses_followed = getlist_fromfile(coursesFollowedFile)
+                    for course_y in courses_followed:
+                        if course_x[0] != course_y[0]:
+                            courses_followed.append(course_x)
+                            writelist_infile(coursesFollowedFile, courses_followed)
 
-            user_state[chat_id] = 0
+                            bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                            break
+                    else:
+                        bot.sendMessage(chat_id, "Stai già seguendo il corso scelto.\n\nPuoi smettere di seguirlo con il comando /stop_listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
+                user_state[chat_id] = 0
+                break
         else:
             bot.sendMessage(chat_id, "Il corso scritto non è presente tra quelli trovati, riprova")
-    #---------------------------------------------------------------------------
+    ############################################################################
     elif cmd_input == "/stop_listen" or cmd_input == "/stop_listen"+bot_name:
-        if not os.path.isfile(fileDir + "courses_followed.txt"):
+        if not os.path.isfile(coursesFollowedFile):
             bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
-            courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
-
             keyboard_courses = []
-            for course_followed in courses_followed:
-                keyboard_courses.append([course_followed])
+            for course_x in getlist_fromfile(coursesFollowedFile):
+                keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
             bot.sendMessage(chat_id, "Seleziona il corso che vuoi che smetta di ascoltare", parse_mode = "Markdown", reply_markup = markup)
+
             user_state[chat_id] = 2
 
     elif user_state[chat_id] == 2:
-        courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
-        if cmd_input in courses_followed:
-            courses_followed.remove(cmd_input)
-            if courses_followed:
-                writelist_infile(courses_followed, fileDir + "courses_followed.txt")
-            else:
-                print(color.CYAN + "[FILE DELETE] Rimosso file courses_followed.txt" + color.END)
-                os.remove(fileDir + "courses_followed.txt")
+        courses_followed = getlist_fromfile(coursesFollowedFile)
+        for course_x in courses_followed:
+            if cmd_input == course_x[0]:
+                courses_followed.remove(course_x)
 
-            bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            user_state[chat_id] = 0
+                if courses_followed:
+                    writelist_infile(coursesFollowedFile, courses_followed)
+                else:
+                    os.remove(coursesFollowedFile)
+                    print(color.CYAN + "[FILE DELETE] Rimosso file courses_followed.txt" + color.END)
+
+                bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                user_state[chat_id] = 0
+                break
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
-    #---------------------------------------------------------------------------
+    ############################################################################
     elif cmd_input == "/viewfiles" or cmd_input == "/viewfiles"+bot_name:
-        if not os.path.isfile(fileDir + "courses_followed.txt"):
-            bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        if not os.path.isfile(coursesFollowedFile):
+            bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso per cui io possa mostrarti i files.\n\nPuoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
-            courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
-
             keyboard_courses = []
-            for course_followed in courses_followed:
-                keyboard_courses.append([course_followed])
+            for course_x in getlist_fromfile(coursesFollowedFile):
+                keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
             bot.sendMessage(chat_id, "Seleziona il corso di cui vuoi vedere i files caricati", parse_mode = "Markdown", reply_markup = markup)
             user_state[chat_id] = 3
 
     elif user_state[chat_id] == 3:
-        courses_followed = loadlist_fromfile(fileDir + "courses_followed.txt")
-        if cmd_input in courses_followed:
-            courses = load_courses(fileDir + "full_courses.txt")
-            files_url = ""
-            for course in courses:
-                if cmd_input == course[0]:
-                    files_url = course[1]
-                    break
+        for course_x in getlist_fromfile(coursesFollowedFile):
+            if cmd_input == course_x[0]:
+                if reconnect(chat_id):
+                    dl_fileslist_fromcourse(course_x[1])
 
-            files_list = download_updated_files(chat_id, files_url)
-            mex = ""
-            for sec in files_list:
-                mex += "Nelle sezione *" + sec[0] + "*:\n"
-                for file_downloaded in sec[1]:
-                    mex += "TIPO: " + file_downloaded[0] + "\n"
-                    mex += "NOME: " + file_downloaded[1] + "\n"
-                    mex += "URL:  " + file_downloaded[2] + "\n"
-                mex += "\n\n"
+                mex = ""
+                filename = filesDir + get_course_ID(course_x[1]) + ".txt"
+                for sec in getlist_fromfile(filename):
+                    mex += "Nelle sezione *" + sec[0] + "*:\n"
+                    for file_downloaded in sec[1]:
+                        mex += type_to_sym[file_downloaded[0]] + " " + file_downloaded[1] + " (" + file_downloaded[2] + ")\n"
+                    mex += "\n"
 
-            try:
-                bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            except telepot.exception.TelegramError:
-                bot.sendMessage(chat_id, "Il corso desiderato ha troppi files per cui non posso inviarteli tutti in questo messaggio", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                try:
+                    bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                except telepot.exception.TelegramError:
+                    bot.sendMessage(chat_id, "Il corso desiderato ha troppi files per cui non posso inviarteli tutti in questo messaggio", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
-            user_state[chat_id] = 0
+                user_state[chat_id] = 0
+                break
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera")
-
+    ############################################################################
     elif cmd_input.startswith("/"):
         bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
 
-# Tries to connect to the unistudium website
+# Managing callback query from callback buttons in inline keyboards
+def on_callback_query(msg):
+    query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
+
+    print('Callback Query:', query_id, from_id, query_data)
+    bot.answerCallbackQuery(query_id, text='Got it, but this will not say anything more than this until my creator will program it.')
+
+# Standard commands input, with texts imported from settings.py file
+def basics_cmds_response(chat_id, cmd_input):
+    if cmd_input == "/start" or cmd_input == "/start"+bot_name:
+        bot.sendMessage(chat_id, start_msg, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        return 1
+
+    elif cmd_input == "/help" or cmd_input == "/help"+bot_name:
+        bot.sendMessage(chat_id, cmd_list, parse_mode = "Markdown")
+        return 1
+
+    elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [dict(text = 'Dona', url = 'https://google.it'),
+             dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
+            ])
+        bot.sendMessage(chat_id, info_msg,  parse_mode = "Markdown", reply_markup = keyboard)
+        return 1
+
+    else:
+        return 0
+
+# Tries to connect to the unistudium website, saving the cookie in the current_session
 def reconnect(chat_id):
-    # Try to ping the server
     bot.sendChatAction(chat_id, "typing")
 
+    # Ping the server
     response = os.system("ping -c 1 www.unistudium.unipg.it > /dev/null")
     if response:
         if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
-
             main_cont = str(current_session.get(MAIN_URL).content)
             if "loginpanel" in main_cont:
                 payload = {
@@ -223,105 +249,67 @@ def reconnect(chat_id):
         bot.sendMessage(chat_id, "Non riesco a contattare il server, riprova più tardi", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     return 0
 
-# Managing callback query from callback buttons in inline keyboards
-def on_callback_query(msg):
-    query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
-
-    print('Callback Query:', query_id, from_id, query_data)
-    bot.answerCallbackQuery(query_id, text='Got it, but this will not say anything more than this until my creator will program it.')
-
-# Standard commands input, with texts imported from settings.py file
-def basics_cmds_response(chat_id, cmd_input):
-    if cmd_input == "/start" or cmd_input == "/start"+bot_name:
-        bot.sendMessage(chat_id, start_msg, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-        return 1
-
-    elif cmd_input == "/help" or cmd_input == "/help"+bot_name:
-        bot.sendMessage(chat_id, cmd_list, parse_mode = "Markdown")
-        return 1
-
-    elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [dict(text = 'Dona', url = 'https://google.it'),
-             dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
-            ])
-        bot.sendMessage(chat_id, info_msg,  parse_mode = "Markdown", reply_markup = keyboard)
-        return 1
-
-    else:
-        return 0
-
 # Function to download courses from Unistudium if not present
-def download_courses(chat_id, path):
-    if not os.path.isfile(fileDir + "full_courses.txt"):
-        if reconnect(chat_id):
-            main_page = current_session.get(MAIN_URL)
+def dl_courses_list(path):
+    main_page = current_session.get(MAIN_URL)
 
-            pattern = "<h3 class=\"coursename\">(.+?)</h3>"
-            courses_html = re.findall(pattern, str(main_page.content))
+    pattern = "<h3 class=\"coursename\">(.+?)</h3>"
+    courses_html = re.findall(pattern, str(main_page.content))
 
-            courses = []
-            for course_html in courses_html:
-                name_pattern = "<\w+.*?>(.+?)<\/a>"
-                url_pattern  = "href=\"(.+?)\""
-                courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
+    courses = []
+    for course_html in courses_html:
+        name_pattern = "<\w+.*?>(.+?)<\/a>"
+        url_pattern  = "href=\"(.+?)\""
+        courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
 
-            writelist_infile(courses, fileDir + "full_courses.txt")
-            print(color.CYAN + "[FILE CREATE] Aggiunto file full_courses.txt" + color.END)
+    writelist_infile(coursesFile, courses)
+    print(color.CYAN + "[FILE CREATE] Aggiunto file courses_list.txt" + color.END)
 
-def download_updated_files(chat_id, files_url):
-    if reconnect(chat_id):
-        course_page = current_session.get(files_url)
+def dl_fileslist_fromcourse(course_url):
+    course_page = current_session.get(course_url)
 
-        pattern = "<li id=\"section-[^0]\"(.+?)<\/ul><\/div><\/li>"
-        sections = re.findall(pattern, str(course_page.content))
+    pattern = "<li id=\"section-[^0]\"(.+?)<\/ul><\/div><\/li>"
+    sections = re.findall(pattern, str(course_page.content))
 
-        files_list = []
-        for i, section in enumerate(sections):
-            pattern = "<h3 class=\"sectionname\">(.+?)</h3>"
-            section_name = re.findall(pattern, str(section))[0]
+    files_list = []
+    for i, section in enumerate(sections):
+        pattern = "<h3 class=\"sectionname\">(.+?)</h3>"
+        section_name = re.findall(pattern, str(section))[0]
 
-            files_list.append([section_name, []])
+        files_list.append([section_name, []])
 
-            pattern = "<div class=\"activityinstance\">(.+?)<\/div>"
-            files_html = re.findall(pattern, str(section))
+        pattern = "<div class=\"activityinstance\">(.+?)<\/div>"
+        files_html = re.findall(pattern, str(section))
 
-            for file_html in files_html:
-                pattern = "<a class=\"\" onclick=\".*\" href=\"(.+?)\""
-                file_link = re.findall(pattern, str(file_html))[0]
+        for file_html in files_html:
+            pattern = "<a class=\"\" onclick=\".*\" href=\"(.+?)\""
+            file_link = re.findall(pattern, str(file_html))[0]
 
-                pattern = "<span class=\"instancename\">(.+?)</span>"
-                file_name_and_type = re.findall(pattern, str(file_html))[0]
+            pattern = "<span class=\"instancename\">(.+?)</span>"
+            file_name_and_type = re.findall(pattern, str(file_html))[0]
 
-                pattern = "(.+?)<span class=\"accesshide \" >"
-                file_name = re.findall(pattern, str(file_name_and_type))[0]
-                file_name = bytes(file_name, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8')
+            pattern = "(.+?)<span class=\"accesshide \" >"
+            file_name = re.findall(pattern, str(file_name_and_type))[0]
+            file_name = bytes(file_name, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8')
 
-                pattern = "<span class=\"accesshide \" > (.+)"
-                file_type = re.findall(pattern, str(file_name_and_type))[0]
+            pattern = "<span class=\"accesshide \" > (.+)"
+            file_type = re.findall(pattern, str(file_name_and_type))[0]
 
-                files_list[i][1].append([file_type, file_name, file_link])
+            files_list[i][1].append([file_type, file_name, file_link])
 
-        return files_list
-    return [] # Error
+    filename = filesDir + get_course_ID(course_url) + ".txt"
+    if not os.path.isfile(filename):
+        print(color.CYAN + "[FILE CREATE] Aggiunto file " + filename + color.END)
+    writelist_infile(filename, files_list)
 
-# courses_wanted can be "urls" or "names"
-def load_courses(path, name_or_url = ""):
-    courses_wanted = []
-    for course in loadlist_fromfile(path):
-        if name_or_url == "names":
-            courses_wanted.append(course[0])
-        elif name_or_url == "urls":
-            courses_wanted.append(course[1])
-        else:
-            courses_wanted.append(course)
+def get_course_ID(course_url):
+    pattern = "id=(.+)"
+    return re.findall(pattern, course_url)[0]
 
-    return courses_wanted
-
-def loadlist_fromfile(path):
+def getlist_fromfile(path):
     return pickle.load(open(path, 'rb'))
 
-def writelist_infile(my_list, path):
+def writelist_infile(path, my_list):
     pickle.dump(my_list, open(path, 'wb'))
 
 def cred_get(field):
@@ -341,10 +329,14 @@ else:
     f = open(pidfile, 'w')
     f.write(pid)
 
-# Check if fileDir exists
-if not os.path.exists(fileDir):
-    os.makedirs(fileDir)
-    print(color.DARKCYAN + "[FOLDER CREATE] Ho aggiunto la cartella /Files/" + color.END)
+# Check if dlDir exists
+if not os.path.exists(dlDir):
+    os.makedirs(dlDir)
+    print(color.DARKCYAN + "[FOLDER CREATE] Ho aggiunto la cartella /Download/" + color.END)
+
+if not os.path.exists(filesDir):
+    os.makedirs(filesDir)
+    print(color.DARKCYAN + "[FOLDER CREATE] Ho aggiunto la cartella /Download/Files/" + color.END)
 
 try:
     bot = telepot.Bot(TOKEN)
