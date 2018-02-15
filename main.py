@@ -162,9 +162,9 @@ def handle(msg):
                     files_url = course[1]
                     break
 
-            final_list = download_updated_files(chat_id, files_url)
+            files_list = download_updated_files(chat_id, files_url)
             mex = ""
-            for sec in final_list:
+            for sec in files_list:
                 mex += "Nelle sezione *" + sec[0] + "*:\n"
                 for file_downloaded in sec[1]:
                     mex += "TIPO: " + file_downloaded[0] + "\n"
@@ -172,10 +172,14 @@ def handle(msg):
                     mex += "URL:  " + file_downloaded[2] + "\n"
                 mex += "\n\n"
 
-            bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            try:
+                bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            except telepot.exception.TelegramError:
+                bot.sendMessage(chat_id, "Il corso desiderato ha troppi files per cui non posso inviarteli tutti in questo messaggio", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
             user_state[chat_id] = 0
         else:
-            bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
+            bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera")
 
     elif cmd_input.startswith("/"):
         bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
@@ -272,12 +276,12 @@ def download_updated_files(chat_id, files_url):
         pattern = "<li id=\"section-[^0]\"(.+?)<\/ul><\/div><\/li>"
         sections = re.findall(pattern, str(course_page.content))
 
-        final_list = []
+        files_list = []
         for i, section in enumerate(sections):
             pattern = "<h3 class=\"sectionname\">(.+?)</h3>"
             section_name = re.findall(pattern, str(section))[0]
 
-            final_list.append([section_name, []])
+            files_list.append([section_name, []])
 
             pattern = "<div class=\"activityinstance\">(.+?)<\/div>"
             files_html = re.findall(pattern, str(section))
@@ -296,9 +300,9 @@ def download_updated_files(chat_id, files_url):
                 pattern = "<span class=\"accesshide \" > (.+)"
                 file_type = re.findall(pattern, str(file_name_and_type))[0]
 
-                final_list[i][1].append([file_type, file_name, file_link])
+                files_list[i][1].append([file_type, file_name, file_link])
 
-        return final_list
+        return files_list
     return [] # Error
 
 # courses_wanted can be "urls" or "names"
