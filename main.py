@@ -16,7 +16,6 @@ import sys
 import time
 import json
 import pickle
-import html
 
 import requests
 import re
@@ -284,7 +283,7 @@ def download_updated_files(chat_id, files_url):
             files_html = re.findall(pattern, str(section))
 
             for file_html in files_html:
-                pattern = "<a class=\"\" onclick=\"\" href=\"(.+?)\""
+                pattern = "<a class=\"\" onclick=\".*\" href=\"(.+?)\""
                 file_link = re.findall(pattern, str(file_html))[0]
 
                 pattern = "<span class=\"instancename\">(.+?)</span>"
@@ -292,6 +291,7 @@ def download_updated_files(chat_id, files_url):
 
                 pattern = "(.+?)<span class=\"accesshide \" >"
                 file_name = re.findall(pattern, str(file_name_and_type))[0]
+                file_name = bytes(file_name, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8')
 
                 pattern = "<span class=\"accesshide \" > (.+)"
                 file_type = re.findall(pattern, str(file_name_and_type))[0]
