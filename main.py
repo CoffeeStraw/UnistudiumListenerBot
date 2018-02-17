@@ -7,9 +7,13 @@ TO DO:
 - Comando per effettuare un tentativo di connessione con le credenziali         [V]
 - Comando per aggiungere tra i corsi di studio seguiti quelli desiderati        [V]
 - Comando per rimuovere  tra i corsi di studio seguiti quelli desiderati        [V]
-    - Invio di un messaggio contenente il nuovo aggiornamento                   [ ]
 - Migliorare gestione liste (in courses_followed salva urls)                    [V]
-- Migliorare invio lista files (max 4096 UTF8 characters)                       [ ]
+- Migliorare invio lista files (max 4096 UTF8 characters)                       [V]
+- Invio di un messaggio contenente l'aggiornamento della lista dei files        [ ]
+- Creazione comando /settings                                                   [ ]
+    - Aggiunta opzione per il download automatico di TUTTI i files              [ ]
+    - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [ ]
+    - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
 '''
 #!/usr/bin/python3.6
 import os
