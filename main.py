@@ -10,7 +10,7 @@ TO DO:
 - Migliorare gestione liste (in courses_followed salva urls)                    [V]
 - Migliorare invio lista files (max 4096 UTF8 characters)                       [V]
 - Invio di un messaggio contenente l'aggiornamento della lista dei files        [ ]
-- Creazione comando /settings                                                   [ ]
+- Creazione comando /settings                                                   [V]
     - Aggiunta opzione per il download automatico di TUTTI i files              [ ]
     - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [ ]
     - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
@@ -35,10 +35,21 @@ user_state = {}
 
 current_session = requests.Session()
 
-# Function to handle incoming messages
 def handle(msg):
-
+    """
+    Function to handle incoming messages
+    """
     content_type, chat_type, chat_id = telepot.glance(msg)
+
+    # Set an initial config file for the chat
+    if not os.path.isfile(configDir+str(chat_id)+".txt"):
+        def_config = [
+        0,    # Italiano
+        1,    # Ricevi le notifiche
+        0     # Non scaricare nessun file
+        ]
+        writelist_infile(configDir+str(chat_id)+".txt", def_config)
+        print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/" + str(chat_id) + ".txt" + color.END)
 
     try:    user_state[chat_id]
     except: user_state[chat_id] = 0
@@ -97,6 +108,9 @@ def handle(msg):
         for course_x in getlist_fromfile(coursesFile):
             if cmd_input == course_x[0]:
                 if not os.path.isfile(coursesFollowedFile):
+                    if reconnect(chat_id):
+                        dl_fileslist_fromcourse(course_x[1])
+
                     writelist_infile(coursesFollowedFile, [course_x])
                     print(color.CYAN + "[FILE] Aggiunto file courses_followed.txt" + color.END)
                     bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
@@ -104,6 +118,9 @@ def handle(msg):
                     courses_followed = getlist_fromfile(coursesFollowedFile)
                     for course_y in courses_followed:
                         if course_x[0] != course_y[0]:
+                            if reconnect(chat_id):
+                                dl_fileslist_fromcourse(course_x[1])
+
                             courses_followed.append(course_x)
                             writelist_infile(coursesFollowedFile, courses_followed)
 
@@ -134,8 +151,10 @@ def handle(msg):
         courses_followed = getlist_fromfile(coursesFollowedFile)
         for course_x in courses_followed:
             if cmd_input == course_x[0]:
-                courses_followed.remove(course_x)
+                os.remove(fileslistDir + get_course_ID(course_x[1]) + ".txt")
+                print(color.CYAN + "[FILE] Rimosso file /Download/FilesList/" + get_course_ID(course_x[1]) + ".txt" + color.END)
 
+                courses_followed.remove(course_x)
                 if courses_followed:
                     writelist_infile(coursesFollowedFile, courses_followed)
                 else:
@@ -166,11 +185,9 @@ def handle(msg):
                 if reconnect(chat_id):
                     dl_fileslist_fromcourse(course_x[1])
 
-                i = 0
-
                 custom_mex = "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n"
-                filename = filesDir + get_course_ID(course_x[1]) + ".txt"
-                mexs = get_formatted_files_list(custom_mex, getlist_fromfile(filename))
+                filename = fileslistDir + get_course_ID(course_x[1]) + ".txt"
+                mexs = get_formatted_fileslist(custom_mex, getlist_fromfile(filename))
 
                 for mex in mexs:
                     bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
@@ -190,8 +207,12 @@ def handle(msg):
 
     elif user_state[chat_id] == 4:
         if cmd_input == settings_options[0]:
+            config = getlist_fromfile(configDir+str(chat_id)+".txt")
+            lang_list = lang_options[:]
+            del lang_list[config[0]]
+
             keyboard = []
-            for opt in lang_options:
+            for opt in lang_list:
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
@@ -199,8 +220,12 @@ def handle(msg):
             user_state[chat_id] = 5
 
         elif cmd_input == settings_options[1]:
+            config = getlist_fromfile(configDir+str(chat_id)+".txt")
+            noti_list = notification_options[:]
+            del noti_list[config[1]]
+
             keyboard = []
-            for opt in not_options:
+            for opt in noti_list:
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
@@ -208,8 +233,12 @@ def handle(msg):
             user_state[chat_id] = 6
 
         elif cmd_input == settings_options[2]:
+            config = getlist_fromfile(configDir+str(chat_id)+".txt")
+            dl_list = dl_options[:]
+            del dl_list[config[2]]
+
             keyboard = []
-            for opt in dl_options:
+            for opt in dl_list:
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
@@ -221,21 +250,24 @@ def handle(msg):
 
     elif user_state[chat_id] == 5:
         if cmd_input in lang_options:
-            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            update_config('lang', lang_options.index(cmd_input), chat_id)
+            bot.sendMessage(chat_id, "La lingua desiderata è stata impostata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id] = 0
         else:
             bot.sendMessage(chat_id, "La lingua specificata non è presente, scegline una dalla tastiera")
 
     elif user_state[chat_id] == 6:
-        if cmd_input in not_options:
-            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        if cmd_input in notification_options:
+            update_config('noti', notification_options.index(cmd_input), chat_id)
+            bot.sendMessage(chat_id, "L'impostazione delle notifiche sono state aggiornate", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id] = 0
         else:
             bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
 
     elif user_state[chat_id] == 7:
         if cmd_input in dl_options:
-            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            update_config('dl', dl_options.index(cmd_input), chat_id)
+            bot.sendMessage(chat_id, "L'impostazione riguardante i download è stata aggiornata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id] = 0
         else:
             bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
@@ -244,15 +276,19 @@ def handle(msg):
     elif cmd_input.startswith("/"):
         bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
 
-# Managing callback query from callback buttons in inline keyboards
 def on_callback_query(msg):
+    """
+    Function to manage callback query from callback buttons in inline keyboards
+    """
     query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
 
     print('Callback Query:', query_id, from_id, query_data)
     bot.answerCallbackQuery(query_id, text='Gotcha, but this will not say anything more than this until my creator will program it.')
 
-# Standard commands input, with texts imported from settings.py file
 def basics_cmds_response(chat_id, cmd_input):
+    """
+    Managing standard commands input, with texts imported from settings.py file
+    """
     if cmd_input == "/start" or cmd_input == "/start"+bot_name:
         bot.sendMessage(chat_id, start_msg, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         return 1
@@ -273,10 +309,23 @@ def basics_cmds_response(chat_id, cmd_input):
         return 0
 
 def update():
-    time.sleep(10)
+    """
+    Checks after tot time if there is any update for the courses choosen
+    """
+    for config_file in os.listdir(configDir):
+        config = getlist_fromfile(configDir + config_file)
+        if config[1] == 1:
+            chat_id = config_file.replace(".txt", "")
+            # Controllo per nuovi updates e dopo invierò questo messaggio
+            print(color.PURPLE + "[SEND] Invio una nuova notifica a " + color.BOLD + chat_id + color.END)
+            bot.sendMessage(chat_id, "Ciao, ci sono nuovi aggiornamenti in uno dei tuoi corsi")
 
-# Tries to connect to the unistudium website, saving the cookie in the current_session
+    time.sleep(60)
+
 def reconnect(chat_id):
+    """
+    Tries to connect to the unistudium website, saving the cookie in current_session
+    """
     bot.sendChatAction(chat_id, "typing")
 
     # Ping the server
@@ -313,8 +362,10 @@ def reconnect(chat_id):
         bot.sendMessage(chat_id, "Non riesco a contattare il server, riprova più tardi", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     return 0
 
-# Function to download courses from Unistudium if not present
 def dl_courseslist(path):
+    """
+    Function to download courses from Unistudium if not present
+    """
     main_page = current_session.get(MAIN_URL)
 
     pattern = "<h3 class=\"coursename\">(.+?)</h3>"
@@ -330,6 +381,9 @@ def dl_courseslist(path):
     print(color.CYAN + "[FILE] Aggiunto file courses_list.txt" + color.END)
 
 def dl_fileslist_fromcourse(course_url):
+    """
+    Downloads files list from the course given
+    """
     course_page = current_session.get(course_url)
 
     pattern = "<li id=\"section-[0-9]+\"(.+?)<\/ul><\/div><\/li>"
@@ -365,16 +419,21 @@ def dl_fileslist_fromcourse(course_url):
             except IndexError:
                 pass
 
-
-    filename = filesDir + get_course_ID(course_url) + ".txt"
+    filename = fileslistDir + get_course_ID(course_url) + ".txt"
     if not os.path.isfile(filename):
-        print(color.CYAN + "[FILE] Aggiunto file " + filename + color.END)
+        print(color.CYAN + "[FILE] Aggiunto file Download/FilesList/" + get_course_ID(course_url) + ".txt" + color.END)
     else:
-        print(color.YELLOW + "[FILE] Sovrascritto file " + filename + color.END)
+        print(color.CYAN + "[FILE] Sovrascritto file Download/FilesList/" + get_course_ID(course_url) + ".txt" + color.END)
+
+    if files_list == []:
+        print(color.RED + "[ERROR] Non sono riuscito a scrivere il file!" + color.END)
 
     writelist_infile(filename, files_list)
 
-def get_formatted_files_list(custom_mex, my_list):
+def get_formatted_fileslist(custom_mex, my_list):
+    """
+    Returns a formatted message generated by the list given
+    """
     i = 0
     mexs = [custom_mex]
 
@@ -384,6 +443,7 @@ def get_formatted_files_list(custom_mex, my_list):
             i += 1
             mexs.append("")
         mexs[i] += sec_string
+
         for file_downloaded in sec[1]:
             if file_downloaded[0] not in type_to_sym:
                 print(color.RED + "[ERROR] Risolvere eccezione simbolo: " + file_downloaded[0] + color.END)
@@ -394,21 +454,50 @@ def get_formatted_files_list(custom_mex, my_list):
                 i += 1
                 mexs.append("")
             mexs[i] += file_string
+
         mexs[i] += "\n"
 
     return mexs
 
+def update_config(param, val, chat_id):
+    """
+    Updates config file
+    """
+    filename = configDir + str(chat_id) + ".txt"
+    upd_config = getlist_fromfile(filename)
+
+    if   param == 'lang':
+        upd_config[0] = val
+    elif param == 'noti':
+        upd_config[1] = val
+    elif param == 'dl':
+        upd_config[2] = val
+
+    writelist_infile(filename, upd_config)
+
 def get_course_ID(course_url):
+    """
+    Returns the ID of a given course
+    """
     pattern = "id=(.+)"
     return re.findall(pattern, course_url)[0]
 
 def getlist_fromfile(path):
+    """
+    Reads a list from a file and returns it
+    """
     return pickle.load(open(path, 'rb'))
 
 def writelist_infile(path, my_list):
+    """
+    Write a list to a file
+    """
     pickle.dump(my_list, open(path, 'wb'))
 
 def cred_get(field):
+    """
+    Read the credentials in the json file and returns the one specified in the field
+    """
     data = json.load(open('cred.json'))
     return data[field]
 
@@ -425,14 +514,22 @@ else:
     f = open(pidfile, 'w')
     f.write(pid)
 
-# Check if dlDir exists
+# Checks if all the dirs exist
 if not os.path.exists(dlDir):
     os.makedirs(dlDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/" + color.END)
-
+if not os.path.exists(fileslistDir):
+    os.makedirs(fileslistDir)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/FilesList/" + color.END)
 if not os.path.exists(filesDir):
     os.makedirs(filesDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/Files/" + color.END)
+if not os.path.exists(userDir):
+    os.makedirs(userDir)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/" + color.END)
+if not os.path.exists(configDir):
+    os.makedirs(configDir)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/UserConfig/" + color.END)
 
 try:
     bot = telepot.Bot(TOKEN)
@@ -442,7 +539,7 @@ try:
         last_update_id = updates[-1]['update_id']
         bot.getUpdates(offset=last_update_id+1)
 
-    bot.message_loop({'chat': handle,
+    bot.message_loop({'chat':           handle,
                       'callback_query': on_callback_query})
 
     print(color.ITALIC + 'Da grandi poteri derivano grandi responsabilità...\n' + color.END)

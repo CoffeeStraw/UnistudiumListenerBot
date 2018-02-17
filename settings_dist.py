@@ -1,5 +1,6 @@
-TOKEN = 'YOUR_TOKEN'
+import os
 
+TOKEN     = 'YOUR_TOKEN'
 bot_name  = "@UnistudiumListenerBot"
 
 start_msg = "*Benvenuto a @UnistudiumListenerBot*.\n"\
@@ -16,13 +17,15 @@ info_msg  = "*UnistudiumListener* è il miglior metodo per tenerti sempre aggior
             " sugli ultimi argomenti caricati dai docenti su *Unistudium*.\n\n"\
             "Se questo bot ti piace, offrimi una birra!"
 
-dlDir    = "YOUR_PATH"
-filesDir = dlDir + "Files/"
+userDir      = os.path.dirname(os.path.abspath(__file__)) + "/UserPref/"
+dlDir        = os.path.dirname(os.path.abspath(__file__)) + "/Download/"
+fileslistDir = dlDir + "FilesList/"
+filesDir     = dlDir + "Files/"
 
-coursesFile = dlDir + "courses_list.txt"
-coursesFollowedFile = dlDir + "courses_followed.txt"
+coursesFile         = dlDir   + "courses_list.txt"
+coursesFollowedFile = userDir + "courses_followed.txt"
 
-pidfile = "/tmp/unistudiumlistener.pid"
+pidfile   = "/tmp/unistudiumlistener.pid"
 
 LOGIN_URL = "https://www.unistudium.unipg.it/unistudium/login/index.php"
 MAIN_URL  = "https://www.unistudium.unipg.it/unistudium/"
@@ -38,7 +41,7 @@ lang_options = [
     "English"
 ]
 
-not_options = [
+notification_options = [
     "Abilita",
     "Disabilita"
 ]
