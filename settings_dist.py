@@ -31,6 +31,8 @@ type_to_sym = {
     "Pagina"       : "📄",
     "File"         : "💾",
     "Prenotazione" : "📅",
+    "URL"          : "🌐",
+    "Cartella"     : "📂"
 }
 
 class color:

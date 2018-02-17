@@ -94,7 +94,7 @@ def handle(msg):
             if cmd_input == course_x[0]:
                 if not os.path.isfile(coursesFollowedFile):
                     writelist_infile(coursesFollowedFile, [course_x])
-                    print(color.CYAN + "[FILE CREATE] Aggiunto file courses_followed.txt" + color.END)
+                    print(color.CYAN + "[FILE] Aggiunto file courses_followed.txt" + color.END)
                     bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 else:
                     courses_followed = getlist_fromfile(coursesFollowedFile)
@@ -136,7 +136,7 @@ def handle(msg):
                     writelist_infile(coursesFollowedFile, courses_followed)
                 else:
                     os.remove(coursesFollowedFile)
-                    print(color.CYAN + "[FILE DELETE] Rimosso file courses_followed.txt" + color.END)
+                    print(color.CYAN + "[FILE] Rimosso file courses_followed.txt" + color.END)
 
                 bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 user_state[chat_id] = 0
@@ -162,18 +162,14 @@ def handle(msg):
                 if reconnect(chat_id):
                     dl_fileslist_fromcourse(course_x[1])
 
-                mex = ""
-                filename = filesDir + get_course_ID(course_x[1]) + ".txt"
-                for sec in getlist_fromfile(filename):
-                    mex += "Nelle sezione *" + sec[0] + "*:\n"
-                    for file_downloaded in sec[1]:
-                        mex += type_to_sym[file_downloaded[0]] + " " + file_downloaded[1] + " (" + file_downloaded[2] + ")\n"
-                    mex += "\n"
+                i = 0
 
-                try:
-                    bot.sendMessage(chat_id, "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n" + mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-                except telepot.exception.TelegramError:
-                    bot.sendMessage(chat_id, "Il corso desiderato ha troppi files per cui non posso inviarteli tutti in questo messaggio", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                custom_mex = "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n"
+                filename = filesDir + get_course_ID(course_x[1]) + ".txt"
+                mexs = get_formatted_files_list(custom_mex, getlist_fromfile(filename))
+
+                for mex in mexs:
+                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
                 user_state[chat_id] = 0
                 break
@@ -188,7 +184,7 @@ def on_callback_query(msg):
     query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
 
     print('Callback Query:', query_id, from_id, query_data)
-    bot.answerCallbackQuery(query_id, text='Got it, but this will not say anything more than this until my creator will program it.')
+    bot.answerCallbackQuery(query_id, text='Gotcha, but this will not say anything more than this until my creator will program it.')
 
 # Standard commands input, with texts imported from settings.py file
 def basics_cmds_response(chat_id, cmd_input):
@@ -263,18 +259,19 @@ def dl_courses_list(path):
         courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
 
     writelist_infile(coursesFile, courses)
-    print(color.CYAN + "[FILE CREATE] Aggiunto file courses_list.txt" + color.END)
+    print(color.CYAN + "[FILE] Aggiunto file courses_list.txt" + color.END)
 
 def dl_fileslist_fromcourse(course_url):
     course_page = current_session.get(course_url)
 
-    pattern = "<li id=\"section-[^0]\"(.+?)<\/ul><\/div><\/li>"
+    pattern = "<li id=\"section-[0-9]+\"(.+?)<\/ul><\/div><\/li>"
     sections = re.findall(pattern, str(course_page.content))
 
     files_list = []
     for i, section in enumerate(sections):
         pattern = "<h3 class=\"sectionname\">(.+?)</h3>"
-        section_name = re.findall(pattern, str(section))[0]
+        try:               section_name = re.findall(pattern, str(section))[0]
+        except IndexError: section_name = "Senza nome"
 
         files_list.append([section_name, []])
 
@@ -282,25 +279,56 @@ def dl_fileslist_fromcourse(course_url):
         files_html = re.findall(pattern, str(section))
 
         for file_html in files_html:
-            pattern = "<a class=\"\" onclick=\".*\" href=\"(.+?)\""
-            file_link = re.findall(pattern, str(file_html))[0]
+            try:
+                pattern = "<a class=\"\" onclick=\".*\" href=\"(.+?)\""
+                file_link = re.findall(pattern, str(file_html))[0]
 
-            pattern = "<span class=\"instancename\">(.+?)</span>"
-            file_name_and_type = re.findall(pattern, str(file_html))[0]
+                pattern = "<span class=\"instancename\">(.+?)</span>"
+                file_name_and_type = re.findall(pattern, str(file_html))[0]
 
-            pattern = "(.+?)<span class=\"accesshide \" >"
-            file_name = re.findall(pattern, str(file_name_and_type))[0]
-            file_name = bytes(file_name, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8')
+                pattern = "(.+?)<span class=\"accesshide \" >"
+                file_name = re.findall(pattern, str(file_name_and_type))[0]
+                file_name = bytes(file_name, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8')
 
-            pattern = "<span class=\"accesshide \" > (.+)"
-            file_type = re.findall(pattern, str(file_name_and_type))[0]
+                pattern = "<span class=\"accesshide \" > (.+)"
+                file_type = re.findall(pattern, str(file_name_and_type))[0]
 
-            files_list[i][1].append([file_type, file_name, file_link])
+                files_list[i][1].append([file_type, file_name, file_link])
+            except IndexError:
+                pass
+
 
     filename = filesDir + get_course_ID(course_url) + ".txt"
     if not os.path.isfile(filename):
-        print(color.CYAN + "[FILE CREATE] Aggiunto file " + filename + color.END)
+        print(color.CYAN + "[FILE] Aggiunto file " + filename + color.END)
+    else:
+        print(color.YELLOW + "[FILE] Sovrascritto file " + filename + color.END)
+
     writelist_infile(filename, files_list)
+
+def get_formatted_files_list(custom_mex, my_list):
+    i = 0
+    mexs = [custom_mex]
+
+    for sec in my_list:
+        sec_string = "Nelle sezione *" + sec[0] + "*:\n"
+        if len(mexs[i] + sec_string) > 4096:
+            i += 1
+            mexs.append("")
+        mexs[i] += sec_string
+        for file_downloaded in sec[1]:
+            if file_downloaded[0] not in type_to_sym:
+                print(color.RED + "[ERROR] Risolvere eccezione simbolo: " + file_downloaded[0] + color.END)
+                type_to_sym[file_downloaded[0]] = "⁉️"
+
+            file_string = type_to_sym[file_downloaded[0]] + " " + file_downloaded[1].replace("_", "\_") + " (" + file_downloaded[2] + ")\n"
+            if len(mexs[i] + file_string) > 4096:
+                i += 1
+                mexs.append("")
+            mexs[i] += file_string
+        mexs[i] += "\n"
+
+    return mexs
 
 def get_course_ID(course_url):
     pattern = "id=(.+)"
@@ -332,11 +360,11 @@ else:
 # Check if dlDir exists
 if not os.path.exists(dlDir):
     os.makedirs(dlDir)
-    print(color.DARKCYAN + "[FOLDER CREATE] Ho aggiunto la cartella /Download/" + color.END)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/" + color.END)
 
 if not os.path.exists(filesDir):
     os.makedirs(filesDir)
-    print(color.DARKCYAN + "[FOLDER CREATE] Ho aggiunto la cartella /Download/Files/" + color.END)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/Files/" + color.END)
 
 try:
     bot = telepot.Bot(TOKEN)
