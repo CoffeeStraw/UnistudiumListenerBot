@@ -27,6 +27,28 @@ pidfile = "/tmp/unistudiumlistener.pid"
 LOGIN_URL = "https://www.unistudium.unipg.it/unistudium/login/index.php"
 MAIN_URL  = "https://www.unistudium.unipg.it/unistudium/"
 
+settings_options = [
+    "Lingua",
+    "Notifiche",
+    "Download automatico"
+]
+
+lang_options = [
+    "Italiano",
+    "English"
+]
+
+not_options = [
+    "Abilita",
+    "Disabilita"
+]
+
+dl_options = [
+    "Abilita per tutti i files",
+    "Abilita solo per gli ultimi files caricati",
+    "Disabilita"
+]
+
 type_to_sym = {
     "Pagina"       : "📄",
     "File"         : "💾",

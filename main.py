@@ -82,7 +82,7 @@ def handle(msg):
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
         if not os.path.isfile(coursesFile):
             if reconnect(chat_id):
-                dl_courses_list(coursesFile)
+                dl_courseslist(coursesFile)
 
         # List courses
         keyboard_courses = []
@@ -180,6 +180,67 @@ def handle(msg):
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera")
     ############################################################################
+    elif cmd_input == "/settings" or cmd_input == "/settings"+bot_name:
+        keyboard = []
+        for opt in settings_options:
+            keyboard.append([ opt ])
+        markup = ReplyKeyboardMarkup(keyboard=keyboard)
+        bot.sendMessage(chat_id, "⚙️ [WIP] Accedi ad una delle impostazioni di seguito riportate, modificandole in base alle tue preferenze", reply_markup = markup)
+        user_state[chat_id] = 4
+
+    elif user_state[chat_id] == 4:
+        if cmd_input == settings_options[0]:
+            keyboard = []
+            for opt in lang_options:
+                keyboard.append([ opt ])
+            markup = ReplyKeyboardMarkup(keyboard=keyboard)
+
+            bot.sendMessage(chat_id, "Seleziona la tua *lingua*", parse_mode = "Markdown", reply_markup = markup)
+            user_state[chat_id] = 5
+
+        elif cmd_input == settings_options[1]:
+            keyboard = []
+            for opt in not_options:
+                keyboard.append([ opt ])
+            markup = ReplyKeyboardMarkup(keyboard=keyboard)
+
+            bot.sendMessage(chat_id, "Seleziona *abilita/disabilita*", parse_mode = "Markdown", reply_markup = markup)
+            user_state[chat_id] = 6
+
+        elif cmd_input == settings_options[2]:
+            keyboard = []
+            for opt in dl_options:
+                keyboard.append([ opt ])
+            markup = ReplyKeyboardMarkup(keyboard=keyboard)
+
+            bot.sendMessage(chat_id, "Seleziona la tua *preferenza*", parse_mode = "Markdown", reply_markup = markup)
+            user_state[chat_id] = 7
+
+        else:
+            bot.sendMessage(chat_id, "L'impostazione specificata non è valida, scegline una dalla tastiera")
+
+    elif user_state[chat_id] == 5:
+        if cmd_input in lang_options:
+            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            user_state[chat_id] = 0
+        else:
+            bot.sendMessage(chat_id, "La lingua specificata non è presente, scegline una dalla tastiera")
+
+    elif user_state[chat_id] == 6:
+        if cmd_input in not_options:
+            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            user_state[chat_id] = 0
+        else:
+            bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
+
+    elif user_state[chat_id] == 7:
+        if cmd_input in dl_options:
+            bot.sendMessage(chat_id, "_Funzione non ancora implementata_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            user_state[chat_id] = 0
+        else:
+            bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
+
+    ############################################################################
     elif cmd_input.startswith("/"):
         bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
 
@@ -202,7 +263,7 @@ def basics_cmds_response(chat_id, cmd_input):
 
     elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [dict(text = 'Dona', url = 'https://google.it'),
+            [dict(text = 'Dona',   url = 'https://google.it'),
              dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
             ])
         bot.sendMessage(chat_id, info_msg,  parse_mode = "Markdown", reply_markup = keyboard)
@@ -210,6 +271,9 @@ def basics_cmds_response(chat_id, cmd_input):
 
     else:
         return 0
+
+def update():
+    time.sleep(10)
 
 # Tries to connect to the unistudium website, saving the cookie in the current_session
 def reconnect(chat_id):
@@ -250,7 +314,7 @@ def reconnect(chat_id):
     return 0
 
 # Function to download courses from Unistudium if not present
-def dl_courses_list(path):
+def dl_courseslist(path):
     main_page = current_session.get(MAIN_URL)
 
     pattern = "<h3 class=\"coursename\">(.+?)</h3>"
@@ -325,7 +389,7 @@ def get_formatted_files_list(custom_mex, my_list):
                 print(color.RED + "[ERROR] Risolvere eccezione simbolo: " + file_downloaded[0] + color.END)
                 type_to_sym[file_downloaded[0]] = "⁉️"
 
-            file_string = type_to_sym[file_downloaded[0]] + " " + file_downloaded[1].replace("_", "\_") + " (" + file_downloaded[2] + ")\n"
+            file_string = type_to_sym[file_downloaded[0]] + " [" + file_downloaded[1].replace("_", "\_") + "](" + file_downloaded[2] + ")\n"
             if len(mexs[i] + file_string) > 4096:
                 i += 1
                 mexs.append("")
@@ -384,6 +448,6 @@ try:
     print(color.ITALIC + 'Da grandi poteri derivano grandi responsabilità...\n' + color.END)
 
     while(1):
-        time.sleep(10)
+        update()
 finally:
     os.unlink(pidfile)
