@@ -17,13 +17,14 @@ info_msg  = "*UnistudiumListener* è il miglior metodo per tenerti sempre aggior
             " sugli ultimi argomenti caricati dai docenti su *Unistudium*.\n\n"\
             "Se questo bot ti piace, offrimi una birra!"
 
-userDir      = os.path.dirname(os.path.abspath(__file__)) + "/UserPref/"
-dlDir        = os.path.dirname(os.path.abspath(__file__)) + "/Download/"
-fileslistDir = dlDir + "FilesList/"
-filesDir     = dlDir + "Files/"
+userDir             = os.path.dirname(os.path.abspath(__file__)) + "/UserPref/"
+configDir           = userDir + "ChatConfig/"
+coursesFollowedDir  = userDir + "CoursesFollowed/"
+coursesFullDir      = userDir + "CoursesFull/"
 
-coursesFile         = dlDir   + "courses_list.txt"
-coursesFollowedFile = userDir + "courses_followed.txt"
+dlDir               = os.path.dirname(os.path.abspath(__file__)) + "/Download/"
+fileslistDir        = dlDir + "FilesList/"
+filesDir            = dlDir + "Files/"
 
 pidfile   = "/tmp/unistudiumlistener.pid"
 
@@ -42,14 +43,14 @@ lang_options = [
 ]
 
 notification_options = [
-    "Abilita",
-    "Disabilita"
+    "Disabilita",
+    "Abilita"
 ]
 
 dl_options = [
+    "Disabilita",
     "Abilita per tutti i files",
-    "Abilita solo per gli ultimi files caricati",
-    "Disabilita"
+    "Abilita solo per gli ultimi files caricati"
 ]
 
 type_to_sym = {

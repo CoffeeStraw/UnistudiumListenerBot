@@ -9,10 +9,10 @@ TO DO:
 - Comando per rimuovere  tra i corsi di studio seguiti quelli desiderati        [V]
 - Migliorare gestione liste (in courses_followed salva urls)                    [V]
 - Migliorare invio lista files (max 4096 UTF8 characters)                       [V]
-- Invio di un messaggio contenente l'aggiornamento della lista dei files        [ ]
+- Invio di un messaggio contenente l'aggiornamento della lista dei files        [V]
 - Creazione comando /settings                                                   [V]
-    - Aggiunta opzione per il download automatico di TUTTI i files              [ ]
-    - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [ ]
+    - Aggiunta opzione per il download automatico di TUTTI i files              [V]
+    - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [V]
     - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
 - Modificare comando /settings (migliore gestione del singolo utente)           [V]
 '''
@@ -631,9 +631,9 @@ def cred_get(field):
     data = json.load(open('cred.json'))
     return data[field]
 
-# ----------------
-# Start working...
-# ----------------
+# -----------------
+# Starts working...
+# -----------------
 pid = str(os.getpid())
 
 # Check if PID exist
