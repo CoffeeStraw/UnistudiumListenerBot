@@ -15,6 +15,7 @@ TO DO:
     - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [V]
     - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
 - Modificare comando /settings (migliore gestione del singolo utente)           [V]
+- Gestire eccezione urllib3.exceptions.ReadTimeoutError (connessione lenta)     [ ]
 '''
 #!/usr/bin/python3.6
 import os
@@ -22,6 +23,7 @@ import sys
 import time
 import json
 import pickle
+from tqdm import tqdm
 
 import requests
 import re
@@ -115,7 +117,8 @@ def handle(msg):
         # List courses
         keyboard_courses = []
         for course_x in getlist_fromfile(coursesFullDir + str(chat_id) + ".txt"):
-            keyboard_courses.append([ course_x[0] ])
+            if course_x not in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
+                keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
         bot.sendMessage(chat_id, "Seleziona il corso che vuoi che ascolti per te", parse_mode = "Markdown", reply_markup = markup)
@@ -369,7 +372,7 @@ def update():
                     old_file = getlist_fromfile(old_file_path)
                     new_file = getlist_fromfile(new_file_path)
 
-                    #del old_file[1]
+                    del old_file[1]
 
                     def find_diff(first_list, second_list):
                         diffs = []
@@ -395,8 +398,6 @@ def update():
 
                     if additions or removes:
                         print(color.GREEN + "Ho trovato nuovi updates nel corso di " + course[0] + color.END)
-                        os.remove(old_file_path)
-                        os.rename(new_file_path, old_file_path)
 
                         # Getting all chat_ids of the users that want to receive the notification
                         chat_ids = []
@@ -410,20 +411,51 @@ def update():
                                         chat_ids.append(chat_id)
                                         break
 
+                        for config_file in os.listdir(configDir):
+                            config = getlist_fromfile(configDir + config_file)
+                            chat_id = config_file.replace(".txt", "")
+
+                            # If there is at least one user that has requested to download the files
+                            if config[2] >= 1 and chat_id in chat_ids:
+                                files_course_path = filesDir + course[0].replace("/", "-") + "/"
+                                if not os.path.exists(files_course_path):
+                                    os.makedirs(files_course_path)
+                                    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/Files/" + course[0] + "/" + color.END)
+
+                                if removes:
+                                    for sec in removes:
+                                        for deleted_file in sec[1]:
+                                            for file_dl in os.listdir(files_course_path):
+                                                if file_dl.split(".")[0] == deleted_file[1]:
+                                                    os.remove(files_course_path + file_dl)
+                                                    break
+                                            else:
+                                                print(color.CYAN + "Ho provato a rimuovere {}, ma non l'ho trovato...".format(deleted_file[1]) + color.END)
+
+                                if additions:
+                                    for sec in additions:
+                                        for file_added in sec[1]:
+                                            dl_file(files_course_path, file_added)
+
+                                break
+
+                        os.remove(old_file_path)
+                        os.rename(new_file_path, old_file_path)
+
                         if additions and removes:
                             custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
                             mexs = get_formatted_fileslist(custom_mex, additions)
 
                             for chat_id in chat_ids:
                                 for mex in mexs:
-                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                             custom_mex = "💣 *Files rimossi:*\n"
                             mexs = get_formatted_fileslist(custom_mex, removes)
 
                             for chat_id in chat_ids:
                                 for mex in mexs:
-                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                         elif additions:
                             custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
@@ -431,7 +463,7 @@ def update():
 
                             for chat_id in chat_ids:
                                 for mex in mexs:
-                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                         elif removes:
                             custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n💣 *Files rimossi:*\n"
@@ -439,11 +471,11 @@ def update():
 
                             for chat_id in chat_ids:
                                 for mex in mexs:
-                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                     else:
                         os.remove(new_file_path)
-                        print(color.YELLOW + "Nessun update trovato, nuovo tentativo in 1 min..." + color.END)
+                        print(color.YELLOW + "Nessun update trovato per {}, nuovo tentativo in 1 min...".format(course[0]) + color.END)
 
     time.sleep(60)
 
@@ -551,7 +583,8 @@ def dl_fileslist_fromcourse(course_url, custom_name = ""):
         filename = custom_name
 
     if not os.path.isfile(fileslistDir + filename):
-        print(color.CYAN + "[FILE] Aggiunto file Download/FilesList/"  + filename + color.END)
+        if custom_name != "temp.txt":
+            print(color.CYAN + "[FILE] Aggiunto file Download/FilesList/"  + filename + color.END)
     else:
         print(color.CYAN + "[FILE] Ho sovrascritto il file Download/FilesList/" + filename + color.END)
 
@@ -559,6 +592,32 @@ def dl_fileslist_fromcourse(course_url, custom_name = ""):
         print(color.RED + "[ERROR] Non sono riuscito a scrivere il file!" + color.END)
 
     writelist_infile(fileslistDir + filename, files_list)
+
+def dl_file(files_course_path, my_file):
+    """
+    Downloads and saves the file specified into the directory files_course_path
+    TO DO:
+    - Generico: salvare la pagina in html                                       [V]
+    - Se è una cartella, cerca tutti i file all'interno e scarica tutto         [ ]
+    - Se è un URL, lo salva come collegamento                                   [ ]
+    """
+    response = current_session.get(my_file[2], stream=True)
+
+    total_size = int(response.headers.get('content-length', 0));
+    chunk_size = 32*1024
+
+    # If we don't know the extension of the file from url, we just take it as html
+    if len(response.url.split('/')[-1].split('.')) == 1 or response.url.split('/')[-1].split('.')[-1].startswith("php"):
+        ext = "html"
+    else:
+        ext = response.url.split('/')[-1].split('.')[-1]
+
+    with open(files_course_path + my_file[1] + "." + ext, "wb") as f:
+        with tqdm(total=total_size, unit='B', unit_scale=True, desc="DL: "+my_file[1]) as pbar:
+            for data in response.iter_content(chunk_size):
+                f.write(data)
+                pbar.update(len(data))
+        f.close()
 
 def get_formatted_fileslist(custom_mex, my_list):
     """
