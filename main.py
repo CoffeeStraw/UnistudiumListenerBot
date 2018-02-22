@@ -14,6 +14,7 @@ TO DO:
     - Aggiunta opzione per il download automatico di TUTTI i files              [ ]
     - Aggiunta opzione per il download automatico degli ultimi files aggiunti   [ ]
     - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
+- Modificare comando /settings (migliore gestione del singolo utente)           [V]
 '''
 #!/usr/bin/python3.6
 import os
@@ -40,36 +41,52 @@ def handle(msg):
     Function to handle incoming messages
     """
     content_type, chat_type, chat_id = telepot.glance(msg)
+    user_id = msg['from']['id']
 
-    # Set an initial config file for the chat
-    if not os.path.isfile(configDir+str(chat_id)+".txt"):
-        def_config = [
-        0,    # Italiano
-        1,    # Ricevi le notifiche
-        0     # Non scaricare nessun file
-        ]
-        writelist_infile(configDir+str(chat_id)+".txt", def_config)
-        print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/" + str(chat_id) + ".txt" + color.END)
-
-    try:    user_state[chat_id]
-    except: user_state[chat_id] = 0
+    if chat_id not in user_state:
+        user_state[chat_id] = {}
+    if user_id not in user_state[chat_id]:
+        user_state[chat_id][user_id] = 0
 
     # Not assuming that every message is a text
     if content_type == 'text':
         cmd_input = msg['text']
+    elif content_type == 'new_chat_member':
+        cmd_input = 'Ti ho aggiunto ad un gruppo'
+        hello_msg = "Ciao, sono *UnistudiumListener*, un bot che vi terrà sempre aggiornati"\
+                    " sugli ultimi caricamenti effettuati dai docenti sul portale di Unistudium.\n\n"\
+                    "_Per ulteriori informazioni usate il comando /info@UnistudiumListenerBot_"
+        bot.sendMessage(chat_id, hello_msg, parse_mode = "Markdown")
+
+        if not os.path.isfile(configDir+str(chat_id)+".txt"):
+            def_config = [
+            0,    # Italian language
+            1,    # Notification ON
+            0     # Don't download any file
+            ]
+            writelist_infile(configDir+str(chat_id)+".txt", def_config)
+            print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
+
+    elif content_type == 'left_chat_member':
+        cmd_input = 'Ti ho rimosso da un gruppo'
+        if os.path.isfile(configDir+str(chat_id)+".txt"):
+            os.remove(configDir+str(chat_id)+".txt")
     else:
-        bot.sendMessage(chat_id, "Il messaggio che hai inviato non è valido, ritenta")
+        cmd_input = ''
+        bot.sendMessage(chat_id, "Il messaggio inviato non è valido, riprova")
 
     # Attempting to save username and full name
-    try:
-        username  = msg['chat']['username']
-        full_name = msg['chat']['first_name'] + ' ' + msg['chat']['last_name']
-    except:
-        username  = "Not defined"
-        full_name = "Not defined"
+    try:    username  = msg['from']['username']
+    except: username  = "Not defined"
+
+    try:    full_name = msg['from']['first_name'] + ' ' + msg['from']['last_name']
+    except: full_name = "Not defined"
 
     # Prints msg from the user
-    print("Msg from {}@{}{}[{}]: \t\"{}{}{}\"".format(color.BOLD, username, color.END, str(chat_id), color.ITALIC, cmd_input, color.END))
+    if chat_id != user_id:
+        print("Msg from {}@{}{}[{}][{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, chat_id, color.ITALIC, cmd_input, color.END))
+    else:
+        print("Msg from {}@{}{}[{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, color.ITALIC, cmd_input, color.END))
 
     if basics_cmds_response(chat_id, cmd_input) != 0:
         pass
@@ -77,7 +94,7 @@ def handle(msg):
     elif cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
         print(color.CYAN + "[CONNECTION] Tentativo di connessione con |" + cred_get("username") + " - ********|" + color.END)
 
-        rec_response = reconnect(chat_id)
+        rec_response = reconnect(report_to_user = False, chat_id = chat_id)
         if rec_response == 1:
             main_page = current_session.get(MAIN_URL)
 
@@ -91,64 +108,64 @@ def handle(msg):
             bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _cred.json_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     ############################################################################
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
-        if not os.path.isfile(coursesFile):
-            if reconnect(chat_id):
-                dl_courseslist(coursesFile)
+        if not os.path.isfile(coursesFullDir + str(chat_id) + ".txt"):
+            if reconnect(report_to_user = True, chat_id = chat_id):
+                dl_courseslist(coursesFullDir + str(chat_id) + ".txt")
 
         # List courses
         keyboard_courses = []
-        for course_x in getlist_fromfile(coursesFile):
+        for course_x in getlist_fromfile(coursesFullDir + str(chat_id) + ".txt"):
             keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
         bot.sendMessage(chat_id, "Seleziona il corso che vuoi che ascolti per te", parse_mode = "Markdown", reply_markup = markup)
-        user_state[chat_id] = 1
+        user_state[chat_id][user_id] = 1
 
-    elif user_state[chat_id] == 1:
-        for course_x in getlist_fromfile(coursesFile):
+    elif user_state[chat_id][user_id] == 1:
+        for course_x in getlist_fromfile(coursesFullDir + str(chat_id) + ".txt"):
             if cmd_input == course_x[0]:
-                if not os.path.isfile(coursesFollowedFile):
-                    if reconnect(chat_id):
+                if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
+                    if reconnect(report_to_user = True, chat_id = chat_id):
                         dl_fileslist_fromcourse(course_x[1])
 
-                    writelist_infile(coursesFollowedFile, [course_x])
+                    writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", [course_x])
                     print(color.CYAN + "[FILE] Aggiunto file courses_followed.txt" + color.END)
                     bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 else:
-                    courses_followed = getlist_fromfile(coursesFollowedFile)
+                    courses_followed = getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt")
                     for course_y in courses_followed:
                         if course_x[0] != course_y[0]:
-                            if reconnect(chat_id):
+                            if reconnect(report_to_user = True, chat_id = chat_id):
                                 dl_fileslist_fromcourse(course_x[1])
 
                             courses_followed.append(course_x)
-                            writelist_infile(coursesFollowedFile, courses_followed)
+                            writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", courses_followed)
 
                             bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                             break
                     else:
                         bot.sendMessage(chat_id, "Stai già seguendo il corso scelto.\n\nPuoi smettere di seguirlo con il comando /stop_listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
-                user_state[chat_id] = 0
+                user_state[chat_id][user_id] = 0
                 break
         else:
             bot.sendMessage(chat_id, "Il corso scritto non è presente tra quelli trovati, riprova")
     ############################################################################
     elif cmd_input == "/stop_listen" or cmd_input == "/stop_listen"+bot_name:
-        if not os.path.isfile(coursesFollowedFile):
+        if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
             bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
             keyboard_courses = []
-            for course_x in getlist_fromfile(coursesFollowedFile):
+            for course_x in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
                 keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
             bot.sendMessage(chat_id, "Seleziona il corso che vuoi che smetta di ascoltare", parse_mode = "Markdown", reply_markup = markup)
 
-            user_state[chat_id] = 2
+            user_state[chat_id][user_id] = 2
 
-    elif user_state[chat_id] == 2:
-        courses_followed = getlist_fromfile(coursesFollowedFile)
+    elif user_state[chat_id][user_id] == 2:
+        courses_followed = getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt")
         for course_x in courses_followed:
             if cmd_input == course_x[0]:
                 os.remove(fileslistDir + get_course_ID(course_x[1]) + ".txt")
@@ -156,33 +173,33 @@ def handle(msg):
 
                 courses_followed.remove(course_x)
                 if courses_followed:
-                    writelist_infile(coursesFollowedFile, courses_followed)
+                    writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", courses_followed)
                 else:
-                    os.remove(coursesFollowedFile)
+                    os.remove(coursesFollowedDir + str(chat_id) + ".txt")
                     print(color.CYAN + "[FILE] Rimosso file courses_followed.txt" + color.END)
 
                 bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-                user_state[chat_id] = 0
+                user_state[chat_id][user_id] = 0
                 break
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
     ############################################################################
     elif cmd_input == "/viewfiles" or cmd_input == "/viewfiles"+bot_name:
-        if not os.path.isfile(coursesFollowedFile):
+        if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
             bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso per cui io possa mostrarti i files.\n\nPuoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
             keyboard_courses = []
-            for course_x in getlist_fromfile(coursesFollowedFile):
+            for course_x in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
                 keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
             bot.sendMessage(chat_id, "Seleziona il corso di cui vuoi vedere i files caricati", parse_mode = "Markdown", reply_markup = markup)
-            user_state[chat_id] = 3
+            user_state[chat_id][user_id] = 3
 
-    elif user_state[chat_id] == 3:
-        for course_x in getlist_fromfile(coursesFollowedFile):
+    elif user_state[chat_id][user_id] == 3:
+        for course_x in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
             if cmd_input == course_x[0]:
-                if reconnect(chat_id):
+                if reconnect(report_to_user = True, chat_id = chat_id):
                     dl_fileslist_fromcourse(course_x[1])
 
                 custom_mex = "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n"
@@ -192,7 +209,7 @@ def handle(msg):
                 for mex in mexs:
                     bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
-                user_state[chat_id] = 0
+                user_state[chat_id][user_id] = 0
                 break
         else:
             bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera")
@@ -203,9 +220,9 @@ def handle(msg):
             keyboard.append([ opt ])
         markup = ReplyKeyboardMarkup(keyboard=keyboard)
         bot.sendMessage(chat_id, "⚙️ [WIP] Accedi ad una delle impostazioni di seguito riportate, modificandole in base alle tue preferenze", reply_markup = markup)
-        user_state[chat_id] = 4
+        user_state[chat_id][user_id] = 4
 
-    elif user_state[chat_id] == 4:
+    elif user_state[chat_id][user_id] == 4:
         if cmd_input == settings_options[0]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
             lang_list = lang_options[:]
@@ -217,7 +234,7 @@ def handle(msg):
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
             bot.sendMessage(chat_id, "Seleziona la tua *lingua*", parse_mode = "Markdown", reply_markup = markup)
-            user_state[chat_id] = 5
+            user_state[chat_id][user_id] = 5
 
         elif cmd_input == settings_options[1]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
@@ -229,8 +246,8 @@ def handle(msg):
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
-            bot.sendMessage(chat_id, "Seleziona *abilita/disabilita*", parse_mode = "Markdown", reply_markup = markup)
-            user_state[chat_id] = 6
+            bot.sendMessage(chat_id, "Seleziona *abilita/disabilita*.\n\n_Ricordati che riceverai notifiche solo dei corsi che hai aggiunto tramite il comando /listen_", parse_mode = "Markdown", reply_markup = markup)
+            user_state[chat_id][user_id] = 6
 
         elif cmd_input == settings_options[2]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
@@ -243,32 +260,32 @@ def handle(msg):
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
             bot.sendMessage(chat_id, "Seleziona la tua *preferenza*", parse_mode = "Markdown", reply_markup = markup)
-            user_state[chat_id] = 7
+            user_state[chat_id][user_id] = 7
 
         else:
             bot.sendMessage(chat_id, "L'impostazione specificata non è valida, scegline una dalla tastiera")
 
-    elif user_state[chat_id] == 5:
+    elif user_state[chat_id][user_id] == 5:
         if cmd_input in lang_options:
             update_config('lang', lang_options.index(cmd_input), chat_id)
             bot.sendMessage(chat_id, "La lingua desiderata è stata impostata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            user_state[chat_id] = 0
+            user_state[chat_id][user_id] = 0
         else:
             bot.sendMessage(chat_id, "La lingua specificata non è presente, scegline una dalla tastiera")
 
-    elif user_state[chat_id] == 6:
+    elif user_state[chat_id][user_id] == 6:
         if cmd_input in notification_options:
             update_config('noti', notification_options.index(cmd_input), chat_id)
             bot.sendMessage(chat_id, "L'impostazione delle notifiche sono state aggiornate", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            user_state[chat_id] = 0
+            user_state[chat_id][user_id] = 0
         else:
             bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
 
-    elif user_state[chat_id] == 7:
+    elif user_state[chat_id][user_id] == 7:
         if cmd_input in dl_options:
             update_config('dl', dl_options.index(cmd_input), chat_id)
             bot.sendMessage(chat_id, "L'impostazione riguardante i download è stata aggiornata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-            user_state[chat_id] = 0
+            user_state[chat_id][user_id] = 0
         else:
             bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
 
@@ -290,6 +307,16 @@ def basics_cmds_response(chat_id, cmd_input):
     Managing standard commands input, with texts imported from settings.py file
     """
     if cmd_input == "/start" or cmd_input == "/start"+bot_name:
+        # Set an initial config file for the chat
+        if not os.path.isfile(configDir+str(chat_id)+".txt"):
+            def_config = [
+            0,    # Italian language
+            1,    # Notification ON
+            0     # Don't download any file
+            ]
+            writelist_infile(configDir+str(chat_id)+".txt", def_config)
+            print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
+
         bot.sendMessage(chat_id, start_msg, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         return 1
 
@@ -311,27 +338,125 @@ def basics_cmds_response(chat_id, cmd_input):
 def update():
     """
     Checks after tot time if there is any update for the courses choosen
+
+    TO DO: Deve cercare prima tutti quanti i corsi e poi notificare gli utenti che segue ciascun corso
     """
-    for config_file in os.listdir(configDir):
-        config = getlist_fromfile(configDir + config_file)
-        if config[1] == 1:
-            chat_id = config_file.replace(".txt", "")
-            # Controllo per nuovi updates e dopo invierò questo messaggio
-            print(color.PURPLE + "[SEND] Invio una nuova notifica a " + color.BOLD + chat_id + color.END)
-            bot.sendMessage(chat_id, "Ciao, ci sono nuovi aggiornamenti in uno dei tuoi corsi")
+    # First I get all courses from various courses_followed files, so that I can
+    # check just one time the course for all the users
+
+    if not os.listdir(configDir):
+        print(color.YELLOW + "Nessun file di configurazione rilevato, eseguire /start in chat con il bot" + color.END)
+    else:
+        all_courses_followed = []
+        for courses_followed_file in os.listdir(coursesFollowedDir):
+            for course in getlist_fromfile(coursesFollowedDir + courses_followed_file):
+                if course not in all_courses_followed:
+                    all_courses_followed.append(course)
+
+        if reconnect(report_to_user = False):
+            print(color.CYAN + "Controllo per nuovi updates..." + color.END)
+            for course in all_courses_followed:
+                if not os.path.isfile(fileslistDir + get_course_ID(course[1]) + ".txt"):
+                    # If we don't have a files list yet, we just download it for the next check
+                    dl_fileslist_fromcourse(course[1])
+                else:
+                    #If we have a file, we download the new version and we try to find all the diffs
+                    dl_fileslist_fromcourse(course[1], "temp.txt")
+
+                    old_file_path = fileslistDir + get_course_ID(course[1]) + ".txt"
+                    new_file_path = fileslistDir + "temp.txt"
+
+                    old_file = getlist_fromfile(old_file_path)
+                    new_file = getlist_fromfile(new_file_path)
+
+                    #del old_file[1]
+
+                    def find_diff(first_list, second_list):
+                        diffs = []
+                        for first_sec in first_list:
+                            for second_sec in second_list:
+                                if first_sec[0] == second_sec[0]:
+                                    file_diffs = []
+                                    for file2 in first_sec[1]:
+                                        for file1 in second_sec[1]:
+                                            if file2 == file1:
+                                                break
+                                        else:
+                                            file_diffs.append(file2)
+                                    if file_diffs:
+                                        diffs.append([first_sec[0], file_diffs])
+                                    break
+                            else:
+                                diffs.append(first_sec)
+                        return diffs
+
+                    additions = find_diff(new_file, old_file)
+                    removes   = find_diff(old_file, new_file)
+
+                    if additions or removes:
+                        print(color.GREEN + "Ho trovato nuovi updates nel corso di " + course[0] + color.END)
+                        os.remove(old_file_path)
+                        os.rename(new_file_path, old_file_path)
+
+                        # Getting all chat_ids of the users that want to receive the notification
+                        chat_ids = []
+                        for config_file in os.listdir(configDir):
+                            config = getlist_fromfile(configDir + config_file)
+                            chat_id = config_file.replace(".txt", "")
+                            courses_followed_filename = coursesFollowedDir + str(chat_id) + ".txt"
+                            if config[1] == 1 and os.path.isfile(courses_followed_filename):
+                                for course_fol in getlist_fromfile(courses_followed_filename):
+                                    if course == course_fol:
+                                        chat_ids.append(chat_id)
+                                        break
+
+                        if additions and removes:
+                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
+                            mexs = get_formatted_fileslist(custom_mex, additions)
+
+                            for chat_id in chat_ids:
+                                for mex in mexs:
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
+                            custom_mex = "💣 *Files rimossi:*\n"
+                            mexs = get_formatted_fileslist(custom_mex, removes)
+
+                            for chat_id in chat_ids:
+                                for mex in mexs:
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
+                        elif additions:
+                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
+                            mexs = get_formatted_fileslist(custom_mex, additions)
+
+                            for chat_id in chat_ids:
+                                for mex in mexs:
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
+                        elif removes:
+                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n💣 *Files rimossi:*\n"
+                            mexs = get_formatted_fileslist(custom_mex, removes)
+
+                            for chat_id in chat_ids:
+                                for mex in mexs:
+                                    bot.sendMessage(chat_id, mex, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+
+                    else:
+                        os.remove(new_file_path)
+                        print(color.YELLOW + "Nessun update trovato, nuovo tentativo in 1 min..." + color.END)
 
     time.sleep(60)
 
-def reconnect(chat_id):
+def reconnect(report_to_user, chat_id = 0):
     """
     Tries to connect to the unistudium website, saving the cookie in current_session
     """
-    bot.sendChatAction(chat_id, "typing")
+    if chat_id != 0:
+        bot.sendChatAction(chat_id, "typing")
 
     # Ping the server
-    response = os.system("ping -c 1 www.unistudium.unipg.it > /dev/null")
-    if response:
-        if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
+    if (cred_get("username") != "YOUR_USERNAME" and cred_get("password") != "YOUR_PASSWORD"):
+        if requests.head(LOGIN_URL).status_code == 200:
             main_cont = str(current_session.get(MAIN_URL).content)
             if "loginpanel" in main_cont:
                 payload = {
@@ -346,7 +471,7 @@ def reconnect(chat_id):
 
                 main_cont = str(current_session.get(MAIN_URL).content)
 
-                if("loginpanel" in main_cont):
+                if "loginpanel" in main_cont:
                     print(color.RED + "[CONNECTION] Credenziali errate" + color.END)
                 else:
                     print(color.GREEN + "[CONNECTION] Connessione al portale UNISTUDIUM effettuata con successo" + color.END)
@@ -355,11 +480,13 @@ def reconnect(chat_id):
                 print(color.YELLOW + "[CONNECTION] Connessione già instaurata" + color.END)
                 return 2
         else:
-            print(color.RED + "[CONNECTION] Credenziali non settate" + color.END)
-            bot.sendMessage(chat_id, "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova.", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            print(color.RED + "[CONNECTION] Server irraggiungibile" + color.END)
+            if report_to_user == True:
+                bot.sendMessage(chat_id, "Non riesco a contattare il server, riprova più tardi", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     else:
-        print(color.RED + "[CONNECTION] Server irraggiungibile" + color.END)
-        bot.sendMessage(chat_id, "Non riesco a contattare il server, riprova più tardi", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        print(color.RED + "[CONNECTION] Credenziali non settate" + color.END)
+        if report_to_user == True:
+            bot.sendMessage(chat_id, "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova.", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     return 0
 
 def dl_courseslist(path):
@@ -377,10 +504,10 @@ def dl_courseslist(path):
         url_pattern  = "href=\"(.+?)\""
         courses.append([re.findall(name_pattern, course_html)[0], re.findall(url_pattern, course_html)[0]])
 
-    writelist_infile(coursesFile, courses)
-    print(color.CYAN + "[FILE] Aggiunto file courses_list.txt" + color.END)
+    writelist_infile(path, courses)
+    print(color.CYAN + "[FILE] Aggiunto file " + path + color.END)
 
-def dl_fileslist_fromcourse(course_url):
+def dl_fileslist_fromcourse(course_url, custom_name = ""):
     """
     Downloads files list from the course given
     """
@@ -419,16 +546,19 @@ def dl_fileslist_fromcourse(course_url):
             except IndexError:
                 pass
 
-    filename = fileslistDir + get_course_ID(course_url) + ".txt"
-    if not os.path.isfile(filename):
-        print(color.CYAN + "[FILE] Aggiunto file Download/FilesList/" + get_course_ID(course_url) + ".txt" + color.END)
+    filename = get_course_ID(course_url) + ".txt"
+    if custom_name != "":
+        filename = custom_name
+
+    if not os.path.isfile(fileslistDir + filename):
+        print(color.CYAN + "[FILE] Aggiunto file Download/FilesList/"  + filename + color.END)
     else:
-        print(color.CYAN + "[FILE] Sovrascritto file Download/FilesList/" + get_course_ID(course_url) + ".txt" + color.END)
+        print(color.CYAN + "[FILE] Ho sovrascritto il file Download/FilesList/" + filename + color.END)
 
     if files_list == []:
         print(color.RED + "[ERROR] Non sono riuscito a scrivere il file!" + color.END)
 
-    writelist_infile(filename, files_list)
+    writelist_infile(fileslistDir + filename, files_list)
 
 def get_formatted_fileslist(custom_mex, my_list):
     """
@@ -438,7 +568,7 @@ def get_formatted_fileslist(custom_mex, my_list):
     mexs = [custom_mex]
 
     for sec in my_list:
-        sec_string = "Nelle sezione *" + sec[0] + "*:\n"
+        sec_string = "Nella sezione *" + sec[0] + "*:\n"
         if len(mexs[i] + sec_string) > 4096:
             i += 1
             mexs.append("")
@@ -518,18 +648,30 @@ else:
 if not os.path.exists(dlDir):
     os.makedirs(dlDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/" + color.END)
+
 if not os.path.exists(fileslistDir):
     os.makedirs(fileslistDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/FilesList/" + color.END)
+
 if not os.path.exists(filesDir):
     os.makedirs(filesDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /Download/Files/" + color.END)
+
 if not os.path.exists(userDir):
     os.makedirs(userDir)
     print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/" + color.END)
+
 if not os.path.exists(configDir):
     os.makedirs(configDir)
-    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/UserConfig/" + color.END)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/ChatConfig/" + color.END)
+
+if not os.path.exists(coursesFullDir):
+    os.makedirs(coursesFullDir)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/CoursesFull/" + color.END)
+
+if not os.path.exists(coursesFollowedDir):
+    os.makedirs(coursesFollowedDir)
+    print(color.DARKCYAN + "[FOLDER] Ho aggiunto la cartella /UserPref/CoursesFollowed/" + color.END)
 
 try:
     bot = telepot.Bot(TOKEN)
