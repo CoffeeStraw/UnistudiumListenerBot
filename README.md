@@ -49,7 +49,8 @@ $ python3 main.py
 
 ---
 Il presente bot è stato realizzato tramite l'utilizzo di [Telepot](https://github.com/nickoala/telepot).
-È inoltre da considerarsi totalmente non ufficiale, né KITLab né Unipg sono responsabili in alcun modo.
+
+È inoltre da considerarsi totalmente **non ufficiale**, né *KITLab* né *Unipg* sono responsabili in alcun modo.
 
 *This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it.*
