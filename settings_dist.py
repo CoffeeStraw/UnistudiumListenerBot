@@ -3,6 +3,8 @@ import os
 TOKEN     = 'YOUR_TOKEN'
 bot_name  = "@UnistudiumListenerBot"
 
+update_time = 60 # seconds
+
 start_msg = "*Benvenuto a @UnistudiumListenerBot*.\n"\
             "Questo bot ti terrà aggiornato in tempo reale sui nuovi caricamenti"\
             " effettuati dai docenti nei rispettivi corsi presenti sulla piattaforma Unistudium.\n\n"\
@@ -51,6 +53,12 @@ dl_options = [
     "Disabilita",
     "Abilita per tutti i files",
     "Abilita solo per gli ultimi files caricati"
+]
+
+def_config = [
+    0,    # Italian language
+    1,    # Notification ON
+    0     # Don't download any file
 ]
 
 type_to_sym = {

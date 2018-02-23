@@ -16,6 +16,7 @@ TO DO:
     - Aggiunta opzione per la selezione della lingua (Italiano/English)         [ ]
 - Modificare comando /settings (migliore gestione del singolo utente)           [V]
 - Gestire eccezione urllib3.exceptions.ReadTimeoutError (connessione lenta)     [ ]
+- Ottenere News dall'apposita sezione presente in ogni corso                    [ ]
 '''
 #!/usr/bin/python3.6
 import os
@@ -61,11 +62,6 @@ def handle(msg):
         bot.sendMessage(chat_id, hello_msg, parse_mode = "Markdown")
 
         if not os.path.isfile(configDir+str(chat_id)+".txt"):
-            def_config = [
-            0,    # Italian language
-            1,    # Notification ON
-            0     # Don't download any file
-            ]
             writelist_infile(configDir+str(chat_id)+".txt", def_config)
             print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
 
@@ -85,11 +81,10 @@ def handle(msg):
     except: full_name = "Not defined"
 
     # Prints msg from the user
-    if chat_id != user_id:
-        print("Msg from {}@{}{}[{}][{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, chat_id, color.ITALIC, cmd_input, color.END))
-    else:
-        print("Msg from {}@{}{}[{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, color.ITALIC, cmd_input, color.END))
+    if chat_id != user_id:  print("Msg from {}@{}{}[{}][{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, chat_id, color.ITALIC, cmd_input, color.END))
+    else:                   print("Msg from {}@{}{}[{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, color.ITALIC, cmd_input, color.END))
 
+    ############################################################################
     if basics_cmds_response(chat_id, cmd_input) != 0:
         pass
     ############################################################################
@@ -117,8 +112,11 @@ def handle(msg):
         # List courses
         keyboard_courses = []
         for course_x in getlist_fromfile(coursesFullDir + str(chat_id) + ".txt"):
-            if course_x not in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
-                keyboard_courses.append([ course_x[0] ])
+            if os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
+                if course_x not in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
+                    keyboard_courses.append([ course_x[0] ])
+            else:
+                    keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
         bot.sendMessage(chat_id, "Seleziona il corso che vuoi che ascolti per te", parse_mode = "Markdown", reply_markup = markup)
@@ -127,6 +125,7 @@ def handle(msg):
     elif user_state[chat_id][user_id] == 1:
         for course_x in getlist_fromfile(coursesFullDir + str(chat_id) + ".txt"):
             if cmd_input == course_x[0]:
+                # If we don't have yet a file list with all the courses followed
                 if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
                     if reconnect(report_to_user = True, chat_id = chat_id):
                         dl_fileslist_fromcourse(course_x[1])
@@ -175,6 +174,7 @@ def handle(msg):
                 print(color.CYAN + "[FILE] Rimosso file /Download/FilesList/" + get_course_ID(course_x[1]) + ".txt" + color.END)
 
                 courses_followed.remove(course_x)
+                # If the list isn't still empty
                 if courses_followed:
                     writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", courses_followed)
                 else:
@@ -271,7 +271,7 @@ def handle(msg):
     elif user_state[chat_id][user_id] == 5:
         if cmd_input in lang_options:
             update_config('lang', lang_options.index(cmd_input), chat_id)
-            bot.sendMessage(chat_id, "La lingua desiderata è stata impostata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, "La lingua specificata è stata impostata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id][user_id] = 0
         else:
             bot.sendMessage(chat_id, "La lingua specificata non è presente, scegline una dalla tastiera")
@@ -293,7 +293,7 @@ def handle(msg):
             bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
 
     ############################################################################
-    elif cmd_input.startswith("/"):
+    elif cmd_input.startswith("/") and chat_id == user_id:
         bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
 
 def on_callback_query(msg):
@@ -312,11 +312,6 @@ def basics_cmds_response(chat_id, cmd_input):
     if cmd_input == "/start" or cmd_input == "/start"+bot_name:
         # Set an initial config file for the chat
         if not os.path.isfile(configDir+str(chat_id)+".txt"):
-            def_config = [
-            0,    # Italian language
-            1,    # Notification ON
-            0     # Don't download any file
-            ]
             writelist_infile(configDir+str(chat_id)+".txt", def_config)
             print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
 
@@ -344,9 +339,9 @@ def update():
 
     TO DO: Deve cercare prima tutti quanti i corsi e poi notificare gli utenti che segue ciascun corso
     """
+
     # First I get all courses from various courses_followed files, so that I can
     # check just one time the course for all the users
-
     if not os.listdir(configDir):
         print(color.YELLOW + "Nessun file di configurazione rilevato, eseguire /start in chat con il bot" + color.END)
     else:
@@ -371,8 +366,6 @@ def update():
 
                     old_file = getlist_fromfile(old_file_path)
                     new_file = getlist_fromfile(new_file_path)
-
-                    del old_file[1]
 
                     def find_diff(first_list, second_list):
                         diffs = []
@@ -429,13 +422,20 @@ def update():
                                                 if file_dl.split(".")[0] == deleted_file[1]:
                                                     os.remove(files_course_path + file_dl)
                                                     break
-                                            else:
-                                                print(color.CYAN + "Ho provato a rimuovere {}, ma non l'ho trovato...".format(deleted_file[1]) + color.END)
+                                            else: #Error
+                                                print(color.CYAN + "[ERROR] Ho provato a rimuovere {}, ma non l'ho trovato...".format(deleted_file[1]) + color.END)
 
                                 if additions:
                                     for sec in additions:
                                         for file_added in sec[1]:
-                                            dl_file(files_course_path, file_added)
+                                            # If the file is already in the directory, we don't download it
+                                            # because if it is an updated file it will be first removed by
+                                            # precedent for
+                                            for file_dl in os.listdir(files_course_path):
+                                                if file_dl.split(".")[0] == file_added[1]:
+                                                    break
+                                            else:
+                                                dl_file(files_course_path, file_added)
 
                                 break
 
@@ -475,9 +475,9 @@ def update():
 
                     else:
                         os.remove(new_file_path)
-                        print(color.YELLOW + "Nessun update trovato per {}, nuovo tentativo in 1 min...".format(course[0]) + color.END)
+                        print(color.YELLOW + "Nessun update trovato per \"{b}{s}{e}\",\nnuovo tentativo in {b}{f:.2f}{e} min...".format(b = color.BOLD, s=course[0], e = color.END + color.YELLOW, f=update_time/60) + color.END)
 
-    time.sleep(60)
+    time.sleep(update_time)
 
 def reconnect(report_to_user, chat_id = 0):
     """
@@ -599,7 +599,7 @@ def dl_file(files_course_path, my_file):
     TO DO:
     - Generico: salvare la pagina in html                                       [V]
     - Se è una cartella, cerca tutti i file all'interno e scarica tutto         [ ]
-    - Se è un URL, lo salva come collegamento                                   [ ]
+    - Se è un URL, lo salva come collegamento (anche appelli)                   [ ]
     """
     response = current_session.get(my_file[2], stream=True)
 
@@ -612,12 +612,20 @@ def dl_file(files_course_path, my_file):
     else:
         ext = response.url.split('/')[-1].split('.')[-1]
 
-    with open(files_course_path + my_file[1] + "." + ext, "wb") as f:
-        with tqdm(total=total_size, unit='B', unit_scale=True, desc="DL: "+my_file[1]) as pbar:
-            for data in response.iter_content(chunk_size):
-                f.write(data)
-                pbar.update(len(data))
-        f.close()
+    if ext != "html":
+        with open(files_course_path + my_file[1] + "." + ext, "wb") as f:
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc="DL: "+my_file[1]) as pbar:
+                for data in response.iter_content(chunk_size):
+                    f.write(data)
+                    pbar.update(len(data))
+    else:
+        print("DL: " + my_file[1] + " in corso...")
+
+        pattern = "<section id=\"region-main\" class=\"span8 pull-right\">(.+?)</section>"
+        file_html = re.findall(pattern, str(response.content))[0]
+
+        with open(files_course_path + my_file[1] + "." + ext, "w") as f:
+            f.write(bytes(file_html, encoding='ascii').decode('unicode-escape').encode('latin-1').decode('utf-8'))
 
 def get_formatted_fileslist(custom_mex, my_list):
     """
