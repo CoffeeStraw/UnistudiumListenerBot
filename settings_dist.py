@@ -5,20 +5,6 @@ bot_name  = "@UnistudiumListenerBot"
 
 update_time = 60 # seconds
 
-start_msg = "*Benvenuto a @UnistudiumListenerBot*.\n"\
-            "Questo bot ti terrà aggiornato in tempo reale sui nuovi caricamenti"\
-            " effettuati dai docenti nei rispettivi corsi presenti sulla piattaforma Unistudium.\n\n"\
-            "_Il bot è stato creato in modo non ufficiale, né KITLab né Unipg sono responsabili in alcun modo._"
-
-cmd_list  = "Questa è una lista degli attuali comandi presenti nel bot:\n\n"\
-            "/help: Lista dei comandi attualmente disponibili\n"\
-            "/info: Informazioni utili sul bot e sul suo creatore\n\n"\
-            "..."\
-
-info_msg  = "*UnistudiumListener* è il miglior metodo per tenerti sempre aggiornato"\
-            " sugli ultimi argomenti caricati dai docenti su *Unistudium*.\n\n"\
-            "Se questo bot ti piace, offrimi una birra!"
-
 userDir             = os.path.dirname(os.path.abspath(__file__)) + "/UserPref/"
 configDir           = userDir + "ChatConfig/"
 coursesFollowedDir  = userDir + "CoursesFollowed/"
@@ -32,28 +18,6 @@ pidfile   = "/tmp/unistudiumlistener.pid"
 
 LOGIN_URL = "https://www.unistudium.unipg.it/unistudium/login/index.php"
 MAIN_URL  = "https://www.unistudium.unipg.it/unistudium/"
-
-settings_options = [
-    "Lingua",
-    "Notifiche",
-    "Download automatico"
-]
-
-lang_options = [
-    "Italiano",
-    "English"
-]
-
-notification_options = [
-    "Disabilita",
-    "Abilita"
-]
-
-dl_options = [
-    "Disabilita",
-    "Abilita per tutti i files",
-    "Abilita solo per gli ultimi files caricati"
-]
 
 def_config = [
     0,    # Italian language
