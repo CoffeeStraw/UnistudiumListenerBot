@@ -3,3 +3,5 @@ cred.json
 settings.py
 /Download
 /UserPref
+/locales/en_US/LC_MESSAGES/messages.mo
+/locales/it_IT/LC_MESSAGES/messages.mo
