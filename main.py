@@ -24,6 +24,7 @@ import sys
 import time
 import json
 import pickle
+import gettext
 from tqdm import tqdm
 
 import requests
@@ -51,15 +52,23 @@ def handle(msg):
     if user_id not in user_state[chat_id]:
         user_state[chat_id][user_id] = 0
 
+    # Get user language from settings
+    try:
+        language = getlist_fromfile(configDir+str(chat_id)+".txt")[0]
+    except FileNotFoundError:
+        language = 0
+
+    if language == 0:
+        lang_it.install()
+    elif language == 1:
+        lang_en.install()
+
     # Not assuming that every message is a text
     if content_type == 'text':
         cmd_input = msg['text']
     elif content_type == 'new_chat_member':
         cmd_input = 'Ti ho aggiunto ad un gruppo'
-        hello_msg = "Ciao, sono *UnistudiumListener*, un bot che vi terrà sempre aggiornati"\
-                    " sugli ultimi caricamenti effettuati dai docenti sul portale di Unistudium.\n\n"\
-                    "_Per ulteriori informazioni usate il comando /info@UnistudiumListenerBot_"
-        bot.sendMessage(chat_id, hello_msg, parse_mode = "Markdown")
+        bot.sendMessage(chat_id, _('add_to_group_msg'), parse_mode = "Markdown")
 
         if not os.path.isfile(configDir+str(chat_id)+".txt"):
             writelist_infile(configDir+str(chat_id)+".txt", def_config)
@@ -91,20 +100,19 @@ def handle(msg):
     elif cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
         print(color.CYAN + "[CONNECTION] Tentativo di connessione con |" + cred_get("username") + " - ********|" + color.END)
 
-        rec_response = reconnect(report_to_user = False, chat_id = chat_id)
+        rec_response = reconnect(report_to_user = True, chat_id = chat_id)
         if rec_response == 1:
             main_page = current_session.get(MAIN_URL)
 
             pattern = "<span class=\"usertext\">(.+?)</span>"
             name = re.findall(pattern, str(main_page.content))[0]
 
-            bot.sendMessage(chat_id, "Sono riuscito a collegarmi, benvenuto *" + name + "*!", parse_mode = "Markdown")
+            bot.sendMessage(chat_id, _('connected_msg').format(name), parse_mode = "Markdown")
         elif rec_response == 2:
-            bot.sendMessage(chat_id, "Sei già connesso al portale", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
-        else:
-            bot.sendMessage(chat_id, "*Errore* in fase di *login*, ritenta sostituendo le credenziali nel file _cred.json_", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('already_connected_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     ############################################################################
     elif cmd_input == "/listen" or cmd_input == "/listen"+bot_name:
+        print(_('choose_course_add_msg'))
         if not os.path.isfile(coursesFullDir + str(chat_id) + ".txt"):
             if reconnect(report_to_user = True, chat_id = chat_id):
                 dl_courseslist(coursesFullDir + str(chat_id) + ".txt")
@@ -119,7 +127,7 @@ def handle(msg):
                     keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
-        bot.sendMessage(chat_id, "Seleziona il corso che vuoi che ascolti per te", parse_mode = "Markdown", reply_markup = markup)
+        bot.sendMessage(chat_id, _('choose_course_add_msg'), parse_mode = "Markdown", reply_markup = markup)
         user_state[chat_id][user_id] = 1
 
     elif user_state[chat_id][user_id] == 1:
@@ -132,7 +140,7 @@ def handle(msg):
 
                     writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", [course_x])
                     print(color.CYAN + "[FILE] Aggiunto file courses_followed.txt" + color.END)
-                    bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                    bot.sendMessage(chat_id, _('notification_course_on_msg').format(cmd_input), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 else:
                     courses_followed = getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt")
                     for course_y in courses_followed:
@@ -143,26 +151,26 @@ def handle(msg):
                             courses_followed.append(course_x)
                             writelist_infile(coursesFollowedDir + str(chat_id) + ".txt", courses_followed)
 
-                            bot.sendMessage(chat_id, "🔔 Da ora in poi riceverai le notifiche di:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                            bot.sendMessage(chat_id, _('notification_course_on_msg').format(cmd_input), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                             break
                     else:
-                        bot.sendMessage(chat_id, "Stai già seguendo il corso scelto.\n\nPuoi smettere di seguirlo con il comando /stop_listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                        bot.sendMessage(chat_id, _('err_already_following_msg'), reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
 
                 user_state[chat_id][user_id] = 0
                 break
         else:
-            bot.sendMessage(chat_id, "Il corso scritto non è presente tra quelli trovati, riprova")
+            bot.sendMessage(chat_id, _('err_course_not_found'))
     ############################################################################
-    elif cmd_input == "/stop_listen" or cmd_input == "/stop_listen"+bot_name:
+    elif cmd_input == "/stoplisten" or cmd_input == "/stoplisten"+bot_name:
         if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
-            bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso, puoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('err_not_following_any_course_msg'), reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
             keyboard_courses = []
             for course_x in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
                 keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
-            bot.sendMessage(chat_id, "Seleziona il corso che vuoi che smetta di ascoltare", parse_mode = "Markdown", reply_markup = markup)
+            bot.sendMessage(chat_id, _('choose_course_rem_msg'), parse_mode = "Markdown", reply_markup = markup)
 
             user_state[chat_id][user_id] = 2
 
@@ -181,22 +189,22 @@ def handle(msg):
                     os.remove(coursesFollowedDir + str(chat_id) + ".txt")
                     print(color.CYAN + "[FILE] Rimosso file courses_followed.txt" + color.END)
 
-                bot.sendMessage(chat_id, "🔕 Da ora in poi non riceverai più notifiche da:\n\n*" + cmd_input + "*", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                bot.sendMessage(chat_id, _('notification_course_off_msg').format(cmd_input), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
                 user_state[chat_id][user_id] = 0
                 break
         else:
-            bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera.")
+            bot.sendMessage(chat_id, _('err_course_not_found'))
     ############################################################################
     elif cmd_input == "/viewfiles" or cmd_input == "/viewfiles"+bot_name:
         if not os.path.isfile(coursesFollowedDir + str(chat_id) + ".txt"):
-            bot.sendMessage(chat_id, "Attualmente non stai seguendo nessun corso per cui io possa mostrarti i files.\n\nPuoi cominciare a seguirne uno col comando /listen", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('err_viewfiles_msg'), reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         else:
             keyboard_courses = []
             for course_x in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
                 keyboard_courses.append([ course_x[0] ])
 
             markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
-            bot.sendMessage(chat_id, "Seleziona il corso di cui vuoi vedere i files caricati", parse_mode = "Markdown", reply_markup = markup)
+            bot.sendMessage(chat_id, _('choose_course_view_msg'), parse_mode = "Markdown", reply_markup = markup)
             user_state[chat_id][user_id] = 3
 
     elif user_state[chat_id][user_id] == 3:
@@ -205,7 +213,7 @@ def handle(msg):
                 if reconnect(report_to_user = True, chat_id = chat_id):
                     dl_fileslist_fromcourse(course_x[1])
 
-                custom_mex = "Ecco tutti i file che ho trovato nel corso di *" + cmd_input + "*:\n\n"
+                custom_mex = _('course_filelist_head_msg').format(cmd_input)
                 filename = fileslistDir + get_course_ID(course_x[1]) + ".txt"
                 mexs = get_formatted_fileslist(custom_mex, getlist_fromfile(filename))
 
@@ -215,19 +223,42 @@ def handle(msg):
                 user_state[chat_id][user_id] = 0
                 break
         else:
-            bot.sendMessage(chat_id, "Il corso scelto non è valido, scegline uno dalla tastiera")
+            bot.sendMessage(chat_id, _('err_course_not_found'))
     ############################################################################
     elif cmd_input == "/settings" or cmd_input == "/settings"+bot_name:
+        # Preventing bot crash
+        if not os.path.isfile(configDir+str(chat_id)+".txt"):
+            writelist_infile(configDir+str(chat_id)+".txt", def_config)
+            print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
+
+        settings_options = [
+            _('set_opt_1'),
+            _('set_opt_2'),
+            _('set_opt_3')
+        ]
+
         keyboard = []
         for opt in settings_options:
             keyboard.append([ opt ])
         markup = ReplyKeyboardMarkup(keyboard=keyboard)
-        bot.sendMessage(chat_id, "⚙️ [WIP] Accedi ad una delle impostazioni di seguito riportate, modificandole in base alle tue preferenze", reply_markup = markup)
+        bot.sendMessage(chat_id, _('settings_initial_msg'), reply_markup = markup)
         user_state[chat_id][user_id] = 4
 
     elif user_state[chat_id][user_id] == 4:
+        settings_options = [
+            _('set_opt_1'),
+            _('set_opt_2'),
+            _('set_opt_3')
+        ]
+
         if cmd_input == settings_options[0]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
+
+            lang_options = [
+                "Italiano",
+                "English"
+            ]
+
             lang_list = lang_options[:]
             del lang_list[config[0]]
 
@@ -236,11 +267,17 @@ def handle(msg):
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
-            bot.sendMessage(chat_id, "Seleziona la tua *lingua*", parse_mode = "Markdown", reply_markup = markup)
+            bot.sendMessage(chat_id, _('choose_lang_msg'), parse_mode = "Markdown", reply_markup = markup)
             user_state[chat_id][user_id] = 5
 
         elif cmd_input == settings_options[1]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
+
+            notification_options = [
+                _('set_disable'),
+                _('set_enable')
+            ]
+
             noti_list = notification_options[:]
             del noti_list[config[1]]
 
@@ -249,11 +286,18 @@ def handle(msg):
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
-            bot.sendMessage(chat_id, "Seleziona *abilita/disabilita*.\n\n_Ricordati che riceverai notifiche solo dei corsi che hai aggiunto tramite il comando /listen_", parse_mode = "Markdown", reply_markup = markup)
+            bot.sendMessage(chat_id, _('choose_noti_msg'), parse_mode = "Markdown", reply_markup = markup)
             user_state[chat_id][user_id] = 6
 
         elif cmd_input == settings_options[2]:
             config = getlist_fromfile(configDir+str(chat_id)+".txt")
+
+            dl_options = [
+                _('set_disable'),
+                _('set_enable1'),
+                _('set_enable2')
+            ]
+
             dl_list = dl_options[:]
             del dl_list[config[2]]
 
@@ -262,39 +306,63 @@ def handle(msg):
                 keyboard.append([ opt ])
             markup = ReplyKeyboardMarkup(keyboard=keyboard)
 
-            bot.sendMessage(chat_id, "Seleziona la tua *preferenza*", parse_mode = "Markdown", reply_markup = markup)
+            bot.sendMessage(chat_id, _('choose_dl_msg'), parse_mode = "Markdown", reply_markup = markup)
             user_state[chat_id][user_id] = 7
 
         else:
-            bot.sendMessage(chat_id, "L'impostazione specificata non è valida, scegline una dalla tastiera")
+            bot.sendMessage(chat_id, _('err_settings_msg'))
 
     elif user_state[chat_id][user_id] == 5:
+        lang_options = [
+            "Italiano",
+            "English"
+        ]
+
         if cmd_input in lang_options:
-            update_config('lang', lang_options.index(cmd_input), chat_id)
-            bot.sendMessage(chat_id, "La lingua specificata è stata impostata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            # Updating language
+            language = lang_options.index(cmd_input)
+            update_config('lang', language, chat_id)
+
+            if language == 0:
+                lang_it.install()
+            elif language == 1:
+                lang_en.install()
+
+            bot.sendMessage(chat_id, _('lang_set_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id][user_id] = 0
         else:
-            bot.sendMessage(chat_id, "La lingua specificata non è presente, scegline una dalla tastiera")
+            bot.sendMessage(chat_id, _('err_settings_set_msg'))
 
     elif user_state[chat_id][user_id] == 6:
+        notification_options = [
+            _('set_disable'),
+            _('set_enable')
+        ]
+
         if cmd_input in notification_options:
             update_config('noti', notification_options.index(cmd_input), chat_id)
-            bot.sendMessage(chat_id, "L'impostazione delle notifiche sono state aggiornate", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('noti_set_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id][user_id] = 0
         else:
-            bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
+            bot.sendMessage(chat_id, _('err_settings_set_msg'))
 
     elif user_state[chat_id][user_id] == 7:
+        dl_options = [
+            _('set_disable'),
+            _('set_enable1'),
+            _('set_enable2')
+        ]
+
         if cmd_input in dl_options:
             update_config('dl', dl_options.index(cmd_input), chat_id)
-            bot.sendMessage(chat_id, "L'impostazione riguardante i download è stata aggiornata", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('dl_set_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
             user_state[chat_id][user_id] = 0
         else:
-            bot.sendMessage(chat_id, "La preferenza specificata non è valida, scegline una dalla tastiera")
+            bot.sendMessage(chat_id, _('err_settings_set_msg'))
 
     ############################################################################
     elif cmd_input.startswith("/") and chat_id == user_id:
-        bot.sendMessage(chat_id, "Il comando inserito non è valido\nProva ad usare /help per una lista dei comandi disponibili")
+        bot.sendMessage(chat_id, _('cmd_input_err_msg'))
 
 def on_callback_query(msg):
     """
@@ -315,19 +383,19 @@ def basics_cmds_response(chat_id, cmd_input):
             writelist_infile(configDir+str(chat_id)+".txt", def_config)
             print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
 
-        bot.sendMessage(chat_id, start_msg, parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+        bot.sendMessage(chat_id, _('start_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
         return 1
 
     elif cmd_input == "/help" or cmd_input == "/help"+bot_name:
-        bot.sendMessage(chat_id, cmd_list, parse_mode = "Markdown")
+        bot.sendMessage(chat_id, _('help_msg'), parse_mode = "Markdown")
         return 1
 
     elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [dict(text = 'Dona',   url = 'https://google.it'),
+            [dict(text = _('donate_inline'),   url = 'https://google.it'),
              dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
             ])
-        bot.sendMessage(chat_id, info_msg,  parse_mode = "Markdown", reply_markup = keyboard)
+        bot.sendMessage(chat_id, _('info_msg'),  parse_mode = "Markdown", reply_markup = keyboard)
         return 1
 
     else:
@@ -443,14 +511,14 @@ def update():
                         os.rename(new_file_path, old_file_path)
 
                         if additions and removes:
-                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
+                            custom_mex = _('new_upd_msg').format(course[0]) + _('new_upd_add_msg')
                             mexs = get_formatted_fileslist(custom_mex, additions)
 
                             for chat_id in chat_ids:
                                 for mex in mexs:
                                     bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
-                            custom_mex = "💣 *Files rimossi:*\n"
+                            custom_mex = _('new_upd_rem_msg')
                             mexs = get_formatted_fileslist(custom_mex, removes)
 
                             for chat_id in chat_ids:
@@ -458,7 +526,7 @@ def update():
                                     bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                         elif additions:
-                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n📎 *Files aggiunti:*\n"
+                            custom_mex = _('new_upd_msg').format(course[0]) + _('new_upd_add_msg')
                             mexs = get_formatted_fileslist(custom_mex, additions)
 
                             for chat_id in chat_ids:
@@ -466,7 +534,7 @@ def update():
                                     bot.sendMessage(chat_id, mex, parse_mode = "Markdown")
 
                         elif removes:
-                            custom_mex = "Ciao, ci sono nuovi update nel corso di *" + course[0] + "*:\n\n💣 *Files rimossi:*\n"
+                            custom_mex = _('new_upd_msg').format(course[0]) + _('new_upd_rem_msg')
                             mexs = get_formatted_fileslist(custom_mex, removes)
 
                             for chat_id in chat_ids:
@@ -514,11 +582,11 @@ def reconnect(report_to_user, chat_id = 0):
         else:
             print(color.RED + "[CONNECTION] Server irraggiungibile" + color.END)
             if report_to_user == True:
-                bot.sendMessage(chat_id, "Non riesco a contattare il server, riprova più tardi", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+                bot.sendMessage(chat_id, _('err_server_unavailable_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     else:
         print(color.RED + "[CONNECTION] Credenziali non settate" + color.END)
         if report_to_user == True:
-            bot.sendMessage(chat_id, "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova.", parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
+            bot.sendMessage(chat_id, _('err_login_msg'), parse_mode = "Markdown", reply_markup = ReplyKeyboardRemove(remove_keyboard = True))
     return 0
 
 def dl_courseslist(path):
@@ -710,6 +778,10 @@ if os.path.isfile(pidfile):
 else:
     f = open(pidfile, 'w')
     f.write(pid)
+
+# Loading languages
+lang_en = gettext.translation("messages", localedir="locales", languages=["en_US"], fallback=True)
+lang_it = gettext.translation("messages", localedir="locales", languages=["it_IT"], fallback=True)
 
 # Checks if all the dirs exist
 if not os.path.exists(dlDir):

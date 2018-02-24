@@ -1,0 +1,177 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: it_IT\n"
+"X-Generator: Poedit 2.0.6\n"
+
+msgid "start_msg"
+msgstr ""
+"*Benvenuto a* @UnistudiumListenerBot.\n"
+"Questo bot ti terrà aggiornato in tempo reale sui nuovi caricamenti effettuati "
+"dai docenti nei rispettivi corsi presenti sulla piattaforma Unistudium.\n"
+"\n"
+"_Il bot è da considerarsi non ufficiale, né KITLab né Unipg sono responsabili "
+"in alcun modo._"
+
+msgid "help_msg"
+msgstr ""
+"Questa è una lista degli attuali *comandi* presenti nel bot:\n"
+"- /info: Informazioni utili sul bot e sul suo creatore\n"
+"- /listen: Permette di aggiungere alla propria lista personale i corsi che si "
+"desiderano far ascoltare al bot\n"
+"- /stoplisten: Permette di rimuovere dalla propria lista personale i corsi di "
+"cui non si vuole più ricevere aggiornamenti\n"
+"- /viewfiles: Permette di visualizzare una lista di tutti i files presenti in "
+"un determinato corso\n"
+"- /settings: Accedi alla sezione dedicata alle impostazioni per modificare "
+"alcuni parametri relativi all'esperienza utente"
+
+msgid "info_msg"
+msgstr ""
+"*UnistudiumListener* è il miglior metodo per tenerti sempre aggiornato sugli "
+"ultimi argomenti caricati dai docenti su *Unistudium*. L'intero codice sorgente "
+"è totalmente open ed è consultabile sulla pagina GitHub del creatore di questo "
+"bot.\n"
+"\n"
+"Se questo bot ti piace, offrimi una birra!"
+
+msgid "add_to_group_msg"
+msgstr ""
+"Ciao, sono *UnistudiumListener*, un bot che vi terrà sempre aggiornati sugli "
+"ultimi caricamenti effettuati dai docenti sul portale di Unistudium.\n"
+"\n"
+"_Per ulteriori informazioni usate il comando_ /info@UnistudiumListenerBot"
+
+msgid "connected_msg"
+msgstr "Sono riuscito a collegarmi, benvenuto *{}*!"
+
+msgid "already_connected_msg"
+msgstr "Sei già connesso al portale"
+
+msgid "err_login_msg"
+msgstr ""
+"Non hai inserito il tuo username e/o la tua password nel file _cred.json_. "
+"Modificali e riprova."
+
+msgid "choose_course_add_msg"
+msgstr "Seleziona il corso che vuoi che ascolti per te"
+
+msgid "notification_course_on_msg"
+msgstr ""
+"🔔 Da ora in poi riceverai le notifiche di:\n"
+"\n"
+"*{}*"
+
+msgid "err_already_following_msg"
+msgstr ""
+"Stai già seguendo il corso scelto.\n"
+"Puoi smettere di seguirlo con il comando /stoplisten"
+
+msgid "err_course_not_found"
+msgstr "Il corso scelto non è valido, scegline uno dalla tastiera"
+
+msgid "err_not_following_any_course_msg"
+msgstr ""
+"Attualmente non stai seguendo nessun corso.\n"
+"Puoi cominciare a seguirne uno col comando /listen"
+
+msgid "choose_course_rem_msg"
+msgstr "Seleziona il corso che vuoi che smetta di ascoltare"
+
+msgid "notification_course_off_msg"
+msgstr ""
+"🔕 Da ora in poi non riceverai più notifiche da:\n"
+"\n"
+"*{}*"
+
+msgid "err_viewfiles_msg"
+msgstr ""
+"Attualmente non stai seguendo nessun corso per cui io possa mostrarti i files.\n"
+"Puoi cominciare a seguirne uno col comando /listen"
+
+msgid "choose_course_view_msg"
+msgstr "Seleziona il corso di cui vuoi vedere i files caricati"
+
+msgid "course_filelist_head_msg"
+msgstr "Ecco tutti i file che ho trovato nel corso di *{}*:"
+
+msgid "settings_initial_msg"
+msgstr ""
+"⚙️ Accedi ad una delle impostazioni di seguito riportate, modificandole in base "
+"alle tue preferenze"
+
+msgid "choose_lang_msg"
+msgstr "Seleziona la tua *lingua*"
+
+msgid "choose_noti_msg"
+msgstr ""
+"Seleziona *abilita/disabilita*.\n"
+"\n"
+"_Ricordati che riceverai notifiche solo dei corsi che hai aggiunto tramite il "
+"comando_ /listen"
+
+msgid "choose_dl_msg"
+msgstr "Seleziona la tua *preferenza*"
+
+msgid "err_settings_msg"
+msgstr "L'impostazione specificata non è valida, scegline una dalla tastiera"
+
+msgid "lang_set_msg"
+msgstr "La lingua specificata è stata impostata"
+
+msgid "noti_set_msg"
+msgstr "L'impostazione riguardante le notifiche è stata aggiornata"
+
+msgid "dl_set_msg"
+msgstr "L'impostazione riguardante i download è stata aggiornata"
+
+msgid "err_settings_set_msg"
+msgstr "La preferenza specificata non è valida, scegline una dalla tastiera"
+
+msgid "cmd_input_err_msg"
+msgstr ""
+"Il comando inserito non è valido\n"
+"Prova ad usare /help per una lista dei comandi disponibili"
+
+msgid "new_upd_msg"
+msgstr "Ciao, ci sono nuovi update nel corso di *{}*:"
+
+msgid "new_upd_add_msg"
+msgstr "📎 *Files aggiunti:*"
+
+msgid "new_upd_rem_msg"
+msgstr "💣 *Files rimossi:*"
+
+msgid "err_server_unavailable_msg"
+msgstr "Non riesco a contattare il server, riprova più tardi..."
+
+msgid "set_opt_1"
+msgstr "Lingua"
+
+msgid "set_opt_2"
+msgstr "Notifiche"
+
+msgid "set_opt_3"
+msgstr "Download automatico"
+
+msgid "set_disable"
+msgstr "Disabilita"
+
+msgid "set_enable"
+msgstr "Abilita"
+
+msgid "set_enable1"
+msgstr "Abilita per tutti i files"
+
+msgid "set_enable2"
+msgstr "Abilita solo per gli ultimi files caricati"
+
+msgid "donate_inline"
+msgstr "Donate"

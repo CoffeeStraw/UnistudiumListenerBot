@@ -1,0 +1,177 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: it_IT\n"
+"X-Generator: Poedit 2.0.6\n"
+
+msgid "start_msg"
+msgstr ""
+"*Welcome to* @UnistudiumListenerBot.\n"
+"This bot will keep you updated in real time about the new uploads of the "
+"professors in the Unistudium platform.\n"
+"\n"
+"_This bot has to be considered unofficial, neither KITLab or Unipg are "
+"responsible in any way._"
+
+msgid "help_msg"
+msgstr ""
+"Here it is a list of the available *commands* that the bot can run:\n"
+"- /info: Useful informations about the bot and its creator\n"
+"- /listen: Allows to add to your personal list the courses you want the bot to "
+"listen for you\n"
+"- /stoplisten: Permette di rimuovere dalla propria lista personale i corsi di "
+"cui non si vuole più ricevere aggiornamenti\n"
+"- /viewfiles: Permette di visualizzare una lista di tutti i files presenti in "
+"un determinato corso\n"
+"- /settings: Accedi alla sezione dedicata alle impostazioni per modificare "
+"alcuni parametri relativi all'esperienza utente"
+
+msgid "info_msg"
+msgstr ""
+"*UnistudiumListener* is the best way to keep you updated on the latest uploads "
+"on you courses in *Unistudium* web site. The full open code is available on "
+"the GitHub web page of the creator.\n"
+"\n"
+"If you like this bot, you could offer a beer to the programmer!"
+
+msgid "add_to_group_msg"
+msgstr ""
+"Hello, I'm *UnistudiumListener*, and from now on I will keep you updated on "
+"the latest uploades made by Teachers on the Unistudium portal.\n"
+"\n"
+"_For more informations, you can use the command_ /info@UnistudiumListenerBot"
+
+msgid "connected_msg"
+msgstr "I managed to connect, welcome *{}*!"
+
+msgid "already_connected_msg"
+msgstr "You're already connected to the Unistudium website"
+
+msgid "err_login_msg"
+msgstr ""
+"You forgot to enter your username and/or your password in the _cred.json_ "
+"file.\n"
+" Please modify them and try again"
+
+msgid "choose_course_add_msg"
+msgstr "Select the course that you want me to hear for you"
+
+msgid "notification_course_on_msg"
+msgstr ""
+"🔔 From now on you will receive notifications about:\n"
+"\n"
+"*{}*"
+
+msgid "err_already_following_msg"
+msgstr ""
+"You're already following the chosen course.\n"
+"Don't forget that you can stop following it using /stoplisten"
+
+msgid "err_course_not_found"
+msgstr "The chosen course isn't valid, please choose one from the keyboard"
+
+msgid "err_not_following_any_course_msg"
+msgstr ""
+"Currently you're not following any course.\n"
+"You can start following one using /listen"
+
+msgid "choose_course_rem_msg"
+msgstr "Select the course you want me to stop listen for you"
+
+msgid "notification_course_off_msg"
+msgstr ""
+"🔕 From now on you will no longer receive notifications about:\n"
+"\n"
+"*{}*"
+
+msgid "err_viewfiles_msg"
+msgstr ""
+"Currently you're not following any course, so I can't show you any files.\n"
+"You can start to follow one using /listen"
+
+msgid "choose_course_view_msg"
+msgstr "Select the course of which you want to view uploaded files"
+
+msgid "course_filelist_head_msg"
+msgstr "Here there are all the files I found in the course of *{}*:"
+
+msgid "settings_initial_msg"
+msgstr ""
+"⚙️ You can modify one of the settings below, changing them according to your "
+"preferences"
+
+msgid "choose_lang_msg"
+msgstr "Select your preferred *language*"
+
+msgid "choose_noti_msg"
+msgstr ""
+"Turn *ON/OFF*.\n"
+"\n"
+"_I would like to remember you that you will receive notifications of only the "
+"courses added with command_ /listen"
+
+msgid "choose_dl_msg"
+msgstr "Select your *preference*"
+
+msgid "err_settings_msg"
+msgstr "The specified setting isn't valid, please choose one from keyboard"
+
+msgid "lang_set_msg"
+msgstr "The specified language has been set"
+
+msgid "noti_set_msg"
+msgstr "The notification setting has been updated"
+
+msgid "dl_set_msg"
+msgstr "The download setting has been updated"
+
+msgid "err_settings_set_msg"
+msgstr "The specified setting isn't valid, please choose one from keyboard"
+
+msgid "cmd_input_err_msg"
+msgstr ""
+"The command specified doesn't exists,\n"
+"Try /help to see a list of all available commands"
+
+msgid "new_upd_msg"
+msgstr "Hi, there are new updated in the course of *{}*:"
+
+msgid "new_upd_add_msg"
+msgstr "📎 *Files added:*"
+
+msgid "new_upd_rem_msg"
+msgstr "💣 *Files removed:*"
+
+msgid "err_server_unavailable_msg"
+msgstr "It seems that I can't contact the server, please try again later..."
+
+msgid "set_opt_1"
+msgstr "Language"
+
+msgid "set_opt_2"
+msgstr "Notification"
+
+msgid "set_opt_3"
+msgstr "Automatic download"
+
+msgid "set_disable"
+msgstr "Disable"
+
+msgid "set_enable"
+msgstr "Enable"
+
+msgid "set_enable1"
+msgstr "Enable for all the files"
+
+msgid "set_enable2"
+msgstr "Enable only for the latest files uploaded"
+
+msgid "donate_inline"
+msgstr "Donate"
