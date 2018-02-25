@@ -56,20 +56,20 @@ def handle(msg):
     try:
         language = getlist_fromfile(configDir+str(chat_id)+".txt")[0]
     except FileNotFoundError:
-        language = 0
+        language = def_config[0]
 
     if language == 0:
         lang_it.install()
     elif language == 1:
         lang_en.install()
 
-    # Not assuming that every message is a text
+    # Checking content_type of the msg
     if content_type == 'text':
         cmd_input = msg['text']
+
     elif content_type == 'new_chat_member':
         cmd_input = 'Ti ho aggiunto ad un gruppo'
         bot.sendMessage(chat_id, _('add_to_group_msg'), parse_mode = "Markdown")
-
         if not os.path.isfile(configDir+str(chat_id)+".txt"):
             writelist_infile(configDir+str(chat_id)+".txt", def_config)
             print(color.DARKCYAN + "[FILE] Ho aggiunto il file /UserPref/ChatConfig/" + str(chat_id) + ".txt" + color.END)
@@ -78,9 +78,9 @@ def handle(msg):
         cmd_input = 'Ti ho rimosso da un gruppo'
         if os.path.isfile(configDir+str(chat_id)+".txt"):
             os.remove(configDir+str(chat_id)+".txt")
-    else:
+
+    else: # The user has sent an image or something unexpected, the bot will not say anything
         cmd_input = ''
-        bot.sendMessage(chat_id, "Il messaggio inviato non è valido, riprova")
 
     # Attempting to save username and full name
     try:    username  = msg['from']['username']
@@ -90,6 +90,9 @@ def handle(msg):
     except: full_name = "Not defined"
 
     # Prints msg from the user
+    if username == "Not defined":
+        username = full_name
+
     if chat_id != user_id:  print("Msg from {}@{}{}[{}][{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, chat_id, color.ITALIC, cmd_input, color.END))
     else:                   print("Msg from {}@{}{}[{}]: \"{}{}{}\"".format(color.BOLD, username.ljust(16), color.END, user_id, color.ITALIC, cmd_input, color.END))
 
@@ -97,7 +100,7 @@ def handle(msg):
     if basics_cmds_response(chat_id, cmd_input) != 0:
         pass
     ############################################################################
-    elif cmd_input == "/attempt_login" or cmd_input == "/attempt_login"+bot_name:
+    elif cmd_input == "/trylogin" or cmd_input == "/trylogin"+bot_name:
         print(color.CYAN + "[CONNECTION] Tentativo di connessione con |" + cred_get("username") + " - ********|" + color.END)
 
         rec_response = reconnect(report_to_user = True, chat_id = chat_id)
@@ -124,7 +127,7 @@ def handle(msg):
                 if course_x not in getlist_fromfile(coursesFollowedDir + str(chat_id) + ".txt"):
                     keyboard_courses.append([ course_x[0] ])
             else:
-                    keyboard_courses.append([ course_x[0] ])
+                keyboard_courses.append([ course_x[0] ])
 
         markup = ReplyKeyboardMarkup(keyboard=keyboard_courses)
         bot.sendMessage(chat_id, _('choose_course_add_msg'), parse_mode = "Markdown", reply_markup = markup)
@@ -213,7 +216,7 @@ def handle(msg):
                 if reconnect(report_to_user = True, chat_id = chat_id):
                     dl_fileslist_fromcourse(course_x[1])
 
-                custom_mex = _('course_filelist_head_msg').format(cmd_input)
+                custom_mex = _('course_filelist_head_msg').format(cmd_input) + "\n\n"
                 filename = fileslistDir + get_course_ID(course_x[1]) + ".txt"
                 mexs = get_formatted_fileslist(custom_mex, getlist_fromfile(filename))
 
@@ -371,7 +374,11 @@ def on_callback_query(msg):
     query_id, from_id, query_data = telepot.glance(msg, flavor='callback_query')
 
     print('Callback Query:', query_id, from_id, query_data)
-    bot.answerCallbackQuery(query_id, text='Gotcha, but this will not say anything more than this until my creator will program it.')
+
+    if query_data == 'donate':
+        bot.answerCallbackQuery(query_id, text = _('donate_msg'))
+    else:
+        bot.answerCallbackQuery(query_id, text='Gotcha, but this will not say anything more than this until my creator will program it.')
 
 def basics_cmds_response(chat_id, cmd_input):
     """
@@ -392,7 +399,7 @@ def basics_cmds_response(chat_id, cmd_input):
 
     elif cmd_input == "/info" or cmd_input == "/info"+bot_name:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [dict(text = _('donate_inline'),   url = 'https://google.it'),
+            [dict(text = _('donate_inline'), callback_data = 'donate'),
              dict(text = 'GitHub', url = 'https://github.com/Porchetta/UnistudiumListenerBot')]
             ])
         bot.sendMessage(chat_id, _('info_msg'),  parse_mode = "Markdown", reply_markup = keyboard)
