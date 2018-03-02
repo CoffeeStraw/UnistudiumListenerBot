@@ -52,7 +52,7 @@ msgstr ""
 msgid "add_to_group_msg"
 msgstr ""
 "Hello, I'm *UnistudiumListener*, and from now on I will keep you updated on "
-"the latest uploades made by Teachers on the Unistudium portal.\n"
+"the latest uploads made by Teachers on the Unistudium portal.\n"
 "\n"
 "_For more informations, you can use the command_ /info@UnistudiumListenerBot"
 
@@ -149,13 +149,27 @@ msgstr ""
 "Try /help to see a list of all available commands"
 
 msgid "new_upd_msg"
-msgstr "Hi, there are new updated in the course of *{}*:"
+msgstr "Hi, I've found some updates in the course of *{}*:"
+
+msgid "sec_msg"
+msgstr "In the section *{}*"
 
 msgid "new_upd_add_msg"
 msgstr "📎 *Files added:*"
 
 msgid "new_upd_rem_msg"
 msgstr "💣 *Files removed:*"
+
+msgid "new_upd_news_msg"
+msgstr "📬 I've found a new message in the forum section of the course *{}*"
+
+msgid "news_post_msg"
+msgstr ""
+"👤 *AUTHOR:* _{}_\n"
+"📆 *DATE:* _{}_\n"
+"\n"
+"📃 *MESSAGE:*\n"
+"{}"
 
 msgid "err_server_unavailable_msg"
 msgstr "It seems that I can't contact the server, please try again later..."

@@ -149,13 +149,27 @@ msgstr ""
 "Prova ad usare /help per una lista dei comandi disponibili"
 
 msgid "new_upd_msg"
-msgstr "Ciao, ci sono nuovi update nel corso di *{}*:"
+msgstr "Ciao, ho trovato dei nuovi aggiornamenti nel corso di *{}*:"
+
+msgid "sec_msg"
+msgstr "Nella sezione *{}*"
 
 msgid "new_upd_add_msg"
 msgstr "📎 *Files aggiunti:*"
 
 msgid "new_upd_rem_msg"
 msgstr "💣 *Files rimossi:*"
+
+msgid "new_upd_news_msg"
+msgstr "📬 Ho trovato un nuovo messaggio nella sezione News del corso *{}*"
+
+msgid "news_post_msg"
+msgstr ""
+"👤 *AUTORE:* _{}_\n"
+"📆 *DATA:* _{}_\n"
+"\n"
+"📃 *MESSAGGIO:*\n"
+"{}"
 
 msgid "err_server_unavailable_msg"
 msgstr "Non riesco a contattare il server, riprova più tardi..."

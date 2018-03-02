@@ -3,7 +3,7 @@ import os
 TOKEN     = 'YOUR_TOKEN'
 bot_name  = "@UnistudiumListenerBot"
 
-update_time = 60 # seconds
+update_time = 3600 # seconds
 
 userDir             = os.path.dirname(os.path.abspath(__file__)) + "/UserPref/"
 configDir           = userDir + "ChatConfig/"
@@ -13,6 +13,7 @@ coursesFullDir      = userDir + "CoursesFull/"
 dlDir               = os.path.dirname(os.path.abspath(__file__)) + "/Download/"
 fileslistDir        = dlDir + "FilesList/"
 filesDir            = dlDir + "Files/"
+newslistDir         = dlDir + "NewsList/"
 
 pidfile   = "/tmp/unistudiumlistener.pid"
 
@@ -20,7 +21,7 @@ LOGIN_URL = "https://www.unistudium.unipg.it/unistudium/login/index.php"
 MAIN_URL  = "https://www.unistudium.unipg.it/unistudium/"
 
 def_config = [
-    0,    # Italian language
+    1,    # English language
     1,    # Notification ON
     0     # Don't download any file
 ]
