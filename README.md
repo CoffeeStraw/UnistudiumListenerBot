@@ -48,7 +48,7 @@ $ python3 main.py
 ```
 
 ---
-Il presente bot è stato realizzato tramite l'utilizzo di [Telepot](https://github.com/nickoala/telepot).
+Il presente bot è stato realizzato tramite l'utilizzo di [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
 
 È inoltre da considerarsi totalmente **non ufficiale**, né *KITLab* né *Unipg* sono responsabili in alcun modo.
 
