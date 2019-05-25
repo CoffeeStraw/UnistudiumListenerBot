@@ -223,7 +223,7 @@ def get_news_msg(current_session, link_news):
     news_content = current_session.get(link_news).content
 
     pattern = r"<div class=\"author\".+?</div>"
-    head = re.search(pattern, str(news_content)).group(1)
+    head = re.search(pattern, str(news_content)).group(0)
 
     pattern = r">(.+?)<"
     head = re.findall(pattern, head)
@@ -238,10 +238,10 @@ def get_news_msg(current_session, link_news):
     news_msg = re.sub(r"<.*?>", "", news_msg)
 
     final_mex = ""\
-                "👤 *AUTORE:* _{}_\n"\
-                "📆 *DATA:* _{}_\n"\
+                "👤 AUTORE: {}\n"\
+                "📆 DATA: {}\n"\
                 "\n"\
-                "📃 *MESSAGGIO:*\n"\
+                "📃 MESSAGGIO:\n"\
                 "{}".format(author, date, news_msg)
 
     return final_mex

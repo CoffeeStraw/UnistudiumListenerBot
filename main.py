@@ -7,6 +7,9 @@ Author: CoffeeStraw
 import re
 import os
 import requests
+import threading
+import time
+
 import logging
 import colorama
 from colorama import Fore, Style
@@ -62,7 +65,7 @@ def help(update, context):
 
 def info(update, context):
     info_msg = "*UnistudiumListener* è il miglior metodo per tenerti sempre aggiornato sugli ultimi argomenti "\
-               "caricati dai docenti su *Unistudium*.\nL'intero codice sorgente è totalmente open ed è "\
+               "caricati dai docenti su *Unistudium.*\nL'intero codice sorgente è totalmente open ed è "\
                "consultabile sulla pagina GitHub del creatore di questo bot.\n\n"
     keyboard = [[InlineKeyboardButton("GitHub", url='https://github.com/CoffeeStraw/UnistudiumListenerBot')]]
     update.message.reply_markdown(info_msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -118,14 +121,20 @@ def viewfiles(update, context):
 
     choose_course_view_files = 'Seleziona il corso di cui vuoi vedere i files caricati'
     reply_keyboard = [[course_name] for course_name in context.user_data['courses'].keys()]
-    update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(
-        reply_keyboard, one_time_keyboard=True))
+    update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
     return 1
 
 
 def viewfiles_1(update, context):
     course_name = update.message.text
-    course_urls = context.user_data['courses'][course_name]
+
+    # Check for course name validity
+    try:
+        course_urls = context.user_data['courses'][course_name]
+    except KeyError:
+        no_course = 'Non è presente un corso con quel nome, riprova.'
+        update.message.reply_text(no_course)
+        return 1
 
     # Get list of files from Unistudium website
     files_list = uni.get_course_fileslist(current_session, course_urls['url'])
@@ -160,26 +169,39 @@ def viewnews(update, context):
 
 def viewnews_1(update, context):
     course_name = update.message.text
-    course_urls = context.user_data['courses'][course_name]
+
+    # Check for course name validity
+    try:
+        course_urls = context.user_data['courses'][course_name]
+    except KeyError:
+        no_course = 'Non è presente un corso con quel nome, riprova.'
+        update.message.reply_text(no_course)
+        return 1
+
     context.user_data['course_news'] = uni.get_forum_news(current_session, course_urls['forum_url'])
-
-    if context.user_data['course_news']:
-        choose_news = 'Seleziona la news di cui vuoi vedere il contenuto'
-        reply_keyboard = [[news_name] for news_name in context.user_data['course_news'].keys()]
-        update.message.reply_text(choose_news, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
-        return 2
-    else:
-        no_news = 'Non è stata trovata nessuna notizia nella materia scelta, riprova.'
+    if not context.user_data['course_news']:
+        no_news = 'Non è presente alcuna notizia nella pagina della materia scelta.'
         update.message.reply_text(no_news)
-
-    return 1
+        return ConversationHandler.END
+    
+    choose_news = 'Seleziona la news di cui vuoi vedere il contenuto'
+    reply_keyboard = [[news_name] for news_name in context.user_data['course_news'].keys()]
+    update.message.reply_text(choose_news, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+    return 2
 
 
 def viewnews_2(update, context):
     news_name = update.message.text
-    news = context.user_data['course_news'][news_name]
+    
+    try:
+        news = context.user_data['course_news'][news_name]
+    except KeyError:
+        no_news = 'La notizia indicata non esiste, riprova.'
+        update.message.reply_text(no_news)
+        return 2
+    
     news_msg = uni.get_news_msg(current_session, news)
-    update.message.reply_text(news_msg)
+    update.message.reply_text(news_msg, reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
@@ -201,6 +223,11 @@ def error(update, error):
 def callback_query(update, context):
     query = update.callback_query
     query.answer("Done")
+
+
+def update(upd_time):
+    while True:
+        time.sleep(1)
 
 
 def main():
@@ -231,7 +258,7 @@ def main():
         entry_points=[CommandHandler('viewfiles', viewfiles)],
 
         states={
-            1: [MessageHandler(Filters.text, viewfiles_1)]
+            1: [MessageHandler(Filters.text | Filters.command, viewfiles_1)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
@@ -251,6 +278,7 @@ def main():
     dp.add_handler(cmd_stoplisten)
     dp.add_handler(cmd_viewfiles)
     dp.add_handler(cmd_viewnews)
+    dp.add_handler(CommandHandler('cancel', cancel))
 
     # Adding callback_query handler
     dp.add_handler(CallbackQueryHandler(callback_query))
@@ -261,6 +289,9 @@ def main():
     # Start the Bot
     updater.start_polling()
 
+    upd = threading.Thread(target=update, args=(UPD_TIME,))
+    upd.start()
+    
     # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
     print("Ready to work.")
     updater.idle()
