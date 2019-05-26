@@ -240,7 +240,7 @@ def viewnews_1(update, context):
     context.user_data['courses'][course_name]['newslist'] = course_news
     if not course_news:
         no_news = 'Non è presente alcuna notizia nella pagina della materia scelta.'
-        update.message.reply_text(no_news)
+        update.message.reply_text(no_news, reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
 
     # Save course selected ID for the next step
@@ -306,7 +306,6 @@ def listen(bot, upd_time):
             # Check if the server is online and the credentials are valid
             response = uni.reconnect(pp.user_data[uid])
             if response != "OK":
-                time.sleep(upd_time)
                 continue
 
             # Download courses list if it doesn't exist
@@ -314,13 +313,11 @@ def listen(bot, upd_time):
                 pp.user_data[uid]['courses'] = uni.get_courseslist(pp.user_data[uid])
 
             for course in pp.user_data[uid]['courses']:
-                logging.info("Controllo corso " + course)
                 # Get the most updated files list
                 new_files_list = uni.get_course_fileslist(pp.user_data[uid], pp.user_data[uid]['courses'][course]['url'])
                 
                 # Check if I don't have a previous version
                 if not 'fileslist' in pp.user_data[uid]['courses'][course]:
-                    logging.info('Il corso non era stato ancora esplorato.')
                     pp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
                     pp.flush()
                     continue
@@ -390,11 +387,9 @@ def listen(bot, upd_time):
 
                         for mex in mexs:
                             bot.sendMessage(uid, mex, parse_mode=ParseMode.MARKDOWN)
-                else:
-                    logging.info("Nessun update per il corso %s trovato" % course)
 
         # Wait for a bit, then check for updates once more
-        logging.info("Aspetto per altri %d secondi" % UPD_TIME)
+        print(Fore.CYAN + "Aspetto per altri %d secondi" % UPD_TIME)
         time.sleep(upd_time)
 
 
