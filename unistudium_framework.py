@@ -5,48 +5,44 @@ import requests
 import re
 from colorama import Fore, Style
 
-from utility import cred_get, text_to_utf8
+import utility as uti
 from settings import type_to_sym, LOGIN_URL, MAIN_URL
 
 
-def reconnect(current_session):
+def reconnect(user_data):
     """
-    Attempt to perform a login to the Unistudium website, saving the cookies in current_session.
+    Attempt to perform a login to the Unistudium website, saving the cookies in user_data.
 
     Returns:
         "OK" if the login was performed correctly, else a description with the error that can be used to inform the users.
     """
-    # Check if credentials are set
-    if (cred_get("username") == "YOUR_USERNAME" or cred_get("password") == "YOUR_PASSWORD"):
-        print(Fore.RED + "[CONNECTION] Credenziali non settate")
-        return "Non hai inserito il tuo username e/o la tua password nel file _cred.json_. Modificali e riprova."
+    # Check if user's session exists
+    if 'session' not in user_data:
+        user_data['session'] = requests.Session()
+
+    # Getting credentials if available
+    try:
+        payload = {
+            "username": user_data['credentials']['username'],
+            "password": user_data['credentials']['password']
+        }
+    except KeyError:
+        return "Non hai effettuato ancora il login, effettualo tramite il comando /login."
 
     # Check if server is alive
     status_code = requests.head(LOGIN_URL).status_code
     if status_code != 200:
-        print(
-            Fore.RED + "[CONNECTION] Server irraggiungibile. Status code: " + str(status_code))
-        return "Non riesco a contattare il server, riprova più tardi..."
+        print(Fore.RED + "[CONNECTION] Server irraggiungibile. Status code: " + str(status_code))
+        return "Non riesco a contattare il server (CODE: %d), riprova più tardi..." % status_code
 
-    # If we're not already connected, we try to connect with credentials
-    if current_session.head(MAIN_URL).status_code == 200:
-        print(Fore.YELLOW + "[CONNECTION] Connessione già instaurata")
+    # Check if the login is still valid (without performing a login)
+    if user_data['session'].head(MAIN_URL).status_code == 200:
         return "OK"
 
-    # Getting credentials
-    payload = {
-        "username": cred_get("username"),
-        "password": cred_get("password")
-    }
-
-    # Trying login
-    if current_session.post(LOGIN_URL, data=payload).url != MAIN_URL:
-        print(Fore.RED + "[CONNECTION] Credenziali errate")
-        return "Credenziali Errate"
-    else:
-        print(
-            Fore.GREEN + "[CONNECTION] Connessione al portale UNISTUDIUM effettuata con successo")
-        return "OK"
+    # Perform the login
+    if user_data['session'].post(LOGIN_URL, data=payload).url != MAIN_URL:
+        return "Le credenziali fornite non sono valide. Riprova."
+    return "OK"
 
 
 def get_course_ID(course_url):
@@ -57,15 +53,15 @@ def get_course_ID(course_url):
     return re.search(pattern, course_url).group(1)
 
 
-def get_courseslist(current_session):
+def get_courseslist(user_data):
     """
-    Attempt to get a list of courses from Unistudium MAIN_URL (view settings.py) page, using the current_session with login performed.
+    Attempt to get a list of courses from Unistudium MAIN_URL (view settings.py) page, using the session in variable user_data (with login performed).
 
     The courses are returned in a dictionary indicized by the course name containing another dictionary with the urls, like:
     {'COURSE NAME': {'url': Course url', 'forum_url': Course forum url'}}
     """
     # Get source code of the main_url page
-    main_page = current_session.get(MAIN_URL)
+    main_page = user_data['session'].get(MAIN_URL)
 
     # Extract the content of some particular h3 tags containing the courses' name and link
     pattern = r"<h3 class=\"coursename\">(.+?)</h3>"
@@ -80,14 +76,14 @@ def get_courseslist(current_session):
     for course_html in courses_html:
         name = pattern_name.search(course_html).group(1).strip()
         url = pattern_url.search(course_html).group(1).strip()
-        forum_url = get_forum_url(current_session, url).strip()
+        forum_url = get_forum_url(user_data['session'], url).strip()
 
         courses[name] = {'url': url, 'forum_url': forum_url}
 
     return courses
 
 
-def get_course_fileslist(current_session, course_url):
+def get_course_fileslist(user_data, course_url):
     """
     Attempt to get a list with all the files in a course's page, grouped by sections.
 
@@ -95,7 +91,7 @@ def get_course_fileslist(current_session, course_url):
     [ ['Section Name', ['Type of File', 'Name of the File', 'URL of the File']], [...] ]
     """
     # Get source code of the course_url page
-    course_page = current_session.get(course_url)
+    course_page = user_data['session'].get(course_url)
 
     # Extract the content from some particular html tags in the course page, retrieving the sections
     pattern = r"<li id=\"section-[0-9]+\"(.+?)<\/ul><\/div><\/li>"
@@ -114,7 +110,7 @@ def get_course_fileslist(current_session, course_url):
         if section_name:
             section_name = section_name.group(1)
         else:
-            section_name = "Introduzione"
+            section_name = "Argomento 0"
         files_list.append([section_name, []])
 
         # Files in the section
@@ -124,7 +120,7 @@ def get_course_fileslist(current_session, course_url):
             try:
                 file_link = pattern_file_link.search(file_html).group(1).strip()
                 file_name, file_type = pattern_file_name_type.search(file_html).group(1, 2)
-                file_name = text_to_utf8(file_name.strip())
+                file_name = uti.text_to_utf8(file_name.strip())
                 file_type = file_type.strip()
 
                 files_list[i][1].append([file_type, file_name, file_link])
@@ -184,7 +180,7 @@ def get_forum_url(current_session, course_url_link):
         return "https://www.unistudium.unipg.it/unistudium/error/"
 
 
-def get_forum_news(current_session, forum_link_url):
+def get_forum_news(user_data, forum_link_url):
     """
     Attempt to get a list of all the forum news from a course forum url
 
@@ -192,7 +188,7 @@ def get_forum_news(current_session, forum_link_url):
     [ ["News name", "URL"], [...] ]
     """
     # Get source code of the forum_url page
-    course_page_content = current_session.get(forum_link_url).content
+    course_page_content = user_data['session'].get(forum_link_url).content
     
     # Extract the content from some particular html tags in the course page, retrieving the sections
     pattern = r"<tr class=(.+?)<\/tr>"
@@ -209,18 +205,18 @@ def get_forum_news(current_session, forum_link_url):
         except AttributeError:
             return []
 
-        name = text_to_utf8(name)
+        name = uti.text_to_utf8(name)
         news[name] = url
 
     return news
 
 
-def get_news_msg(current_session, link_news):
+def get_news_msg(user_data, link_news):
     """
     Access to a news from url given and returns the content of the news
     """
     # Get source code of the forum_url page
-    news_content = current_session.get(link_news).content
+    news_content = user_data['session'].get(link_news).content
 
     pattern = r"<div class=\"author\".+?</div>"
     head = re.search(pattern, str(news_content)).group(0)
@@ -229,18 +225,17 @@ def get_news_msg(current_session, link_news):
     head = re.findall(pattern, head)
 
     author = head[1].title()
-    date = text_to_utf8(head[2].replace(" - ", "")).title()
+    date = uti.text_to_utf8(head[2].replace(" - ", "")).title()
 
-    pattern = r"<div class=\"posting fullpost\".+?<p>(.+?)</p><div class=\"attachedimages\""
-    news_msg = text_to_utf8(re.search(pattern, str(news_content)).group(1))
+    pattern = r"<div class=\"posting fullpost\".+?>(.+?)<div class=\"attachedimages\""
+    news_msg = uti.text_to_utf8(re.search(pattern, str(news_content)).group(1))
 
-    news_msg = re.sub(r"<br */? *>", "\n", news_msg).replace("</p>", "\n")
+    news_msg = re.sub(r"<br */? *>", "\n", news_msg).replace("</p>", "\n").replace("</div>", "\n")
     news_msg = re.sub(r"<.*?>", "", news_msg)
 
     final_mex = ""\
                 "👤 AUTORE: {}\n"\
-                "📆 DATA: {}\n"\
-                "\n"\
+                "📆 DATA: {}\n\n"\
                 "📃 MESSAGGIO:\n"\
                 "{}".format(author, date, news_msg)
 

@@ -4,32 +4,31 @@
 UnistudiumListener - Telegram Bot
 Author: CoffeeStraw
 """
-import re
 import os
+import re
+import time
 import requests
 import threading
-import time
 
 import logging
 import colorama
 from colorama import Fore, Style
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove,
-                      InlineKeyboardButton, InlineKeyboardMarkup, ChatAction)
+                      InlineKeyboardButton, InlineKeyboardMarkup, ChatAction, ParseMode)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
-                          ConversationHandler, CallbackQueryHandler)
+                          ConversationHandler, CallbackQueryHandler, PicklePersistence)
 
 import unistudium_framework as uni
-from utility import cred_get
 from settings import TOKEN, UPD_TIME, MAIN_URL
 
 # Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Starting session for persisten cookies
-current_session = requests.Session()
+# Create PicklePersistence object
+pp = PicklePersistence(filename='ul_data.pickle', on_flush=True)
+
 
 
 def start(update, context):
@@ -43,21 +42,15 @@ def start(update, context):
     return ConversationHandler.END
 
 
-def help(update, context):
+def help_list(update, context):
     help_msg = "Questa è una lista degli attuali *comandi* presenti nel bot:\n\n"\
-        "- /info: Informazioni utili sul bot e sul suo creatore\n\n"\
-        "- /trylogin: Effettua un tentativo di connessione al portale di Unistudium con le credenziali "\
-        "fornite all'interno del file _cred.json_\n\n"\
-        "- /listen: Permette di aggiungere alla propria lista personale i corsi che si desiderano far "\
-        "ascoltare al bot\n\n"\
-        "- /stoplisten: Permette di rimuovere dalla propria lista personale i corsi di cui non si "\
-        "vuole più ricevere aggiornamenti\n\n"\
-        "- /viewfiles: Permette di visualizzare una lista di tutti i files presenti in un determinato "\
-        "corso\n\n"\
-        "- /viewnews: Permette di visualizzare una lista di tutte le news presenti nella sezione forum "\
-        "di un determinato corso e leggerne il contenuto\n\n"\
-        "- /settings: Accedi alla sezione dedicata alle impostazioni per modificare alcuni parametri "\
-        "relativi all'esperienza utente"
+        "- /cancel: Annulla un comando in esecuzione\n\n"\
+        "- /info: Informazioni utili sul bot e sulla pagina ufficiale GitHub\n\n"\
+        "- /login: Effettua il Login sul portale Unistudium chiedendo le credenziali\n\n"\
+        "- /logout: Cancella ogni dato personale raccolto dal Bot, compresa la sessione corrente ed effettuando quindi il Logout dal portale\n\n"\
+        "- /stoplisten: Permette di selezionare un corso scegliendo di non ricevere più le sue notifiche\n\n"\
+        "- /viewfiles: Permette di visualizzare una lista di tutti i files presenti in un determinato corso\n\n"\
+        "- /viewnews: Permette di visualizzare una lista delle news presenti nella sezione \"Annunci\" di un corso e leggerne il contenuto"
     update.message.reply_markdown(help_msg)
 
     return ConversationHandler.END
@@ -73,27 +66,72 @@ def info(update, context):
     return ConversationHandler.END
 
 
-def trylogin(update, context):
+def login(update, context):
     """
-    Simple debug command that can be used to check if we can actually connect to the Unistudium portal
+    Command to perform a login on the Unistudium Portal
     """
-    print(Fore.CYAN + "[CONNECTION] Tentativo di connessione con |{} - {}|".format(cred_get("username"), "*"*len(cred_get("password"))))
+    send_user_pwd = 'Inserisci il tuo *username* e la tua *password* nel seguente formato (con un solo spazio in mezzo):\n\n'\
+                    'username password\n\n'\
+                    '_Si ricorda che il bot cancellerà immediatamente il messaggio inviato non appena sarà stato effettuato il login, per questioni di Privacy._'
+
+    update.message.reply_markdown(send_user_pwd)
+    return 1
+
+
+def login_1(update, context):
+    # Save credentials
+    context.user_data['credentials'] = {}
+
+    user_pass = update.message.text.split(' ')
+
+    if len(user_pass) == 2:
+        context.user_data['credentials']['username'], context.user_data['credentials']['password'] = user_pass
+    else:
+        update.message.reply_markdown("Non hai *formattato correttamente* le tue credenziali, riprova.", reply_markup=ReplyKeyboardRemove())
+        return 1
+
+    # Send a message to the user to let him wait
+    update.message.reply_text("Tentativo di connessione in corso, attendere...")
     context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
 
-    response = uni.reconnect(current_session)
-    if response != "OK":
-        update.message.reply_markdown(
-            response, reply_markup=ReplyKeyboardRemove())
-        return ConversationHandler.END
+    # Delete user message
+    context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=update.message.message_id)
 
-    main_page = current_session.get(MAIN_URL)
+    # Try login
+    response = uni.reconnect(context.user_data)
+    if response != "OK":
+        update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
+        return 1
+
+    # Getting Name and Surname of the user just to show that login was performed correctly
+    main_page = context.user_data['session'].get(MAIN_URL)
 
     pattern = "<span class=\"usertext\">(.+?)</span>"
     name = re.findall(pattern, str(main_page.content))[0]
 
-    update.message.reply_markdown("Sono riuscito a collegarmi, benvenuto *%s*!" % name)
+    update.message.reply_markdown("Sono riuscito a collegarmi, benvenuto *%s*!" % name.title())
+    
+    # Update pickle file
+    pp.flush()
+
     return ConversationHandler.END
 
+
+def logout(update, context):
+    """
+    Remove all the user's data from the pickle file
+    """
+    # Delete all
+    for key in list(context.user_data):  # Using a list to prevent RuntimeError, since user_data could change during iterations
+        del context.user_data[key]
+
+    # Update pickle file
+    pp.flush()
+
+    # Notification message
+    update.message.reply_markdown("Tutti i dati che erano presenti (credenziali, corsi seguiti, preferenze) sono stati rimossi con successo.\n\n"\
+                                  "_Questo comporta anche che non riceverai più alcuna notifica nel caso seguissi precedentemente qualche corso._")
+    return ConversationHandler.END
 
 def stoplisten(update, context):
     # TO DO
@@ -110,18 +148,24 @@ def viewfiles(update, context):
     Request a list of files of a specific course in Unistudium
     """
     # If the user hasn't requested the list of the courses already, we get it using the unistudium framework
+    response = uni.reconnect(context.user_data)
+    if response != "OK":
+        # Error
+        update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+
+    # Check if the list of the courses is available
     if 'courses' not in context.user_data:
-        response = uni.reconnect(current_session)
-        if response != "OK":
-            # Error
-            update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
-            return ConversationHandler.END
+        context.user_data['courses'] = uni.get_courseslist(context.user_data)
 
-        context.user_data['courses'] = uni.get_courseslist(current_session)
-
+    # Send message with list of courses to the user
     choose_course_view_files = 'Seleziona il corso di cui vuoi vedere i files caricati'
     reply_keyboard = [[course_name] for course_name in context.user_data['courses'].keys()]
     update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+    
+    # Update pickle file
+    pp.flush()
+    
     return 1
 
 
@@ -137,12 +181,19 @@ def viewfiles_1(update, context):
         return 1
 
     # Get list of files from Unistudium website
-    files_list = uni.get_course_fileslist(current_session, course_urls['url'])
+    files_list = uni.get_course_fileslist(context.user_data, course_urls['url'])
+    context.user_data['courses'][course_name]['fileslist'] = files_list
+    
+    # Format the fileslist
     custom_mex = 'Ecco tutti i file che ho trovato nel corso di *%s*:\n\n' % course_name
     mexs = uni.get_formatted_fileslist(files_list, custom_mex)
 
+    # Send list of files to the user
     for mex in mexs:
         update.message.reply_markdown(mex, reply_markup=ReplyKeyboardRemove())
+
+    # Save in the pickle file
+    pp.flush()
 
     return ConversationHandler.END
 
@@ -152,18 +203,24 @@ def viewnews(update, context):
     view news from unistudium
     """
     # If the user hasn't requested the list of the courses already, we get it using the unistudium framework
+    response = uni.reconnect(context.user_data)
+    if response != "OK":
+        # Error
+        update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+
+    # Check if the list of the courses is available
     if 'courses' not in context.user_data:
-        response = uni.reconnect(current_session)
-        if response != "OK":
-            # Error
-            update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
-            return ConversationHandler.END
+        context.user_data['courses'] = uni.get_courseslist(context.user_data)
 
-        context.user_data['courses'] = uni.get_courseslist(current_session)
-
-    choose_course_view_files = 'Seleziona il corso di cui vuoi vedere le news caricate'
+    # Send message with list of courses to the user
+    choose_course_view_news = 'Seleziona il corso di cui vuoi vedere le news caricate'
     reply_keyboard = [[course_name] for course_name in context.user_data['courses'].keys()]
-    update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+    update.message.reply_text(choose_course_view_news, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+
+    # Save in the pickle file
+    pp.flush()
+
     return 1
 
 
@@ -178,15 +235,25 @@ def viewnews_1(update, context):
         update.message.reply_text(no_course)
         return 1
 
-    context.user_data['course_news'] = uni.get_forum_news(current_session, course_urls['forum_url'])
-    if not context.user_data['course_news']:
+    # Check news availability
+    course_news = uni.get_forum_news(context.user_data, course_urls['forum_url'])
+    context.user_data['courses'][course_name]['newslist'] = course_news
+    if not course_news:
         no_news = 'Non è presente alcuna notizia nella pagina della materia scelta.'
         update.message.reply_text(no_news)
         return ConversationHandler.END
-    
+
+    # Save course selected ID for the next step
+    context.user_data['course_selected'] = course_name
+
+    # Send message to the user
     choose_news = 'Seleziona la news di cui vuoi vedere il contenuto'
-    reply_keyboard = [[news_name] for news_name in context.user_data['course_news'].keys()]
+    reply_keyboard = [[news_name] for news_name in course_news.keys()]
     update.message.reply_text(choose_news, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+
+    # Save in the pickle file
+    pp.flush()
+
     return 2
 
 
@@ -194,14 +261,20 @@ def viewnews_2(update, context):
     news_name = update.message.text
     
     try:
-        news = context.user_data['course_news'][news_name]
+        course_name = context.user_data['course_selected']
+        news = context.user_data['courses'][course_name]['newslist'][news_name]
+        del context.user_data['course_selected']
     except KeyError:
         no_news = 'La notizia indicata non esiste, riprova.'
         update.message.reply_text(no_news)
         return 2
     
-    news_msg = uni.get_news_msg(current_session, news)
+    news_msg = uni.get_news_msg(context.user_data, news)
     update.message.reply_text(news_msg, reply_markup=ReplyKeyboardRemove())
+
+    # Save in the pickle file
+    pp.flush()
+
     return ConversationHandler.END
 
 
@@ -225,9 +298,104 @@ def callback_query(update, context):
     query.answer("Done")
 
 
-def update(upd_time):
+def listen(bot, upd_time):
     while True:
-        time.sleep(1)
+        print(Fore.CYAN + "Controllo per nuovi updates...")
+
+        for uid in pp.user_data:
+            # Check if the server is online and the credentials are valid
+            response = uni.reconnect(pp.user_data[uid])
+            if response != "OK":
+                time.sleep(upd_time)
+                continue
+
+            # Download courses list if it doesn't exist
+            if 'courses' not in pp.user_data[uid]:
+                pp.user_data[uid]['courses'] = uni.get_courseslist(pp.user_data[uid])
+
+            for course in pp.user_data[uid]['courses']:
+                logging.info("Controllo corso " + course)
+                # Get the most updated files list
+                new_files_list = uni.get_course_fileslist(pp.user_data[uid], pp.user_data[uid]['courses'][course]['url'])
+                
+                # Check if I don't have a previous version
+                if not 'fileslist' in pp.user_data[uid]['courses'][course]:
+                    logging.info('Il corso non era stato ancora esplorato.')
+                    pp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
+                    pp.flush()
+                    continue
+                    
+                old_files_list = pp.user_data[uid]['courses'][course]['fileslist']
+                
+                # Find the differences between these two lists
+                def find_diff(first_list, second_list):
+                    diffs = []
+                    # Iterate over the sections
+                    for first_sec in first_list:
+                        for second_sec in second_list:
+                            # If the section name is the same, we could find diffs
+                            if first_sec[0] == second_sec[0]:
+                                file_diffs = []
+                                for file2 in first_sec[1]:
+                                    for file1 in second_sec[1]:
+                                        if file2 == file1:
+                                            break
+                                    else:
+                                        file_diffs.append(file2)
+                                if file_diffs:
+                                    diffs.append([first_sec[0], file_diffs])
+                                break
+                        else:
+                            # This is a new section, add it to the diffs
+                            diffs.append(first_sec)
+                    return diffs
+
+                # Find additions and removes
+                additions = find_diff(new_files_list, old_files_list)
+                removes   = find_diff(old_files_list, new_files_list)
+
+                # Get the most updated forum news
+                # TO DO
+
+                # Notify all the users "registered" of the updates
+                if additions or removes:
+                    # Update data
+                    pp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
+                    pp.flush()
+                    print(Fore.GREEN + "Ho trovato nuovi updates nel corso di %s (per uid: %d)" % (course, uid))
+
+                    # If we have both additions and removes
+                    new_upd_msg = "Ciao, ho trovato dei nuovi aggiornamenti nel corso di:\n*{}*".format(course)
+                    if additions and removes:
+                        custom_mex = new_upd_msg + "\n\n📎 *Files aggiunti:*\n\n"
+                        mexs = uni.get_formatted_fileslist(additions, custom_mex)
+
+                        for mex in mexs:
+                            bot.sendMessage(uid, mex, parse_mode=ParseMode.MARKDOWN)
+
+                        custom_mex = "💣 *Files rimossi:*\n\n"
+                        mexs = uni.get_formatted_fileslist(removes, custom_mex)
+
+                        for mex in mexs:
+                            bot.sendMessage(uid, mex, parse_mode=ParseMode.MARKDOWN)
+                    elif additions:
+                        custom_mex = new_upd_msg + "\n\n📎 *Files aggiunti:*\n\n"
+                        mexs = uni.get_formatted_fileslist(additions, custom_mex)
+
+                        for mex in mexs:
+                            bot.sendMessage(uid, mex, parse_mode=ParseMode.MARKDOWN)
+                    elif removes:
+                        custom_mex = new_upd_msg + "\n\n💣 *Files rimossi:*\n\n"
+                        mexs = uni.get_formatted_fileslist(removes, custom_mex)
+
+                        for mex in mexs:
+                            bot.sendMessage(uid, mex, parse_mode=ParseMode.MARKDOWN)
+                else:
+                    logging.info("Nessun update per il corso %s trovato" % course)
+
+        # Wait for a bit, then check for updates once more
+        logging.info("Aspetto per altri %d secondi" % UPD_TIME)
+        time.sleep(upd_time)
 
 
 def main():
@@ -235,14 +403,20 @@ def main():
     colorama.init(autoreset=True)
 
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(TOKEN, use_context=True)
+    updater = Updater(TOKEN, persistence=pp, use_context=True)
     dp = updater.dispatcher
 
     # Adding all the handler for the commands
-    dp.add_handler(CommandHandler('start', start))
-    dp.add_handler(CommandHandler('help', help))
-    dp.add_handler(CommandHandler('info', info))
-    dp.add_handler(CommandHandler('trylogin', trylogin))
+    cmd_login = ConversationHandler(
+        entry_points=[CommandHandler('login', login)],
+
+        states={
+            1: [MessageHandler(Filters.text, login_1)]
+        },
+
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
 
     cmd_stoplisten = ConversationHandler(
         entry_points=[CommandHandler('stoplisten', stoplisten)],
@@ -275,6 +449,11 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
+    dp.add_handler(CommandHandler('start', start))
+    dp.add_handler(CommandHandler('help', help_list))
+    dp.add_handler(CommandHandler('info', info))
+    dp.add_handler(CommandHandler('logout', logout))
+    dp.add_handler(cmd_login)
     dp.add_handler(cmd_stoplisten)
     dp.add_handler(cmd_viewfiles)
     dp.add_handler(cmd_viewnews)
@@ -282,18 +461,18 @@ def main():
 
     # Adding callback_query handler
     dp.add_handler(CallbackQueryHandler(callback_query))
-
-    # log all errors
+    # Log all errors
     dp.add_error_handler(error)
 
     # Start the Bot
     updater.start_polling()
+    print("Ready to work.")
 
-    upd = threading.Thread(target=update, args=(UPD_TIME,))
-    upd.start()
+    # Start the listener for new files in courses' page
+    listener = threading.Thread(target=listen, args=(updater.bot, UPD_TIME))
+    listener.start()
     
     # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
-    print("Ready to work.")
     updater.idle()
 
 
