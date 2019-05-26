@@ -78,7 +78,7 @@ def get_courseslist(user_data):
         url = pattern_url.search(course_html).group(1).strip()
         forum_url = get_forum_url(user_data['session'], url).strip()
 
-        courses[name] = {'url': url, 'forum_url': forum_url}
+        courses[name] = {'followed': '🔔', 'url': url, 'forum_url': forum_url}
 
     return courses
 

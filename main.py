@@ -39,6 +39,9 @@ def start(update, context):
 
     update.message.reply_markdown(start_msg)
 
+    # We have a new user, add it to the pickle file
+    pp.flush()
+
     return ConversationHandler.END
 
 
@@ -48,7 +51,7 @@ def help_list(update, context):
         "- /info: Informazioni utili sul bot e sulla pagina ufficiale GitHub\n\n"\
         "- /login: Effettua il Login sul portale Unistudium chiedendo le credenziali\n\n"\
         "- /logout: Cancella ogni dato personale raccolto dal Bot, compresa la sessione corrente ed effettuando quindi il Logout dal portale\n\n"\
-        "- /stoplisten: Permette di selezionare un corso scegliendo di non ricevere più le sue notifiche\n\n"\
+        "- /notifications: Permette di selezionare un corso e abilitare/disabilitare le sue notifiche\n\n"\
         "- /viewfiles: Permette di visualizzare una lista di tutti i files presenti in un determinato corso\n\n"\
         "- /viewnews: Permette di visualizzare una lista delle news presenti nella sezione \"Annunci\" di un corso e leggerne il contenuto"
     update.message.reply_markdown(help_msg)
@@ -133,12 +136,46 @@ def logout(update, context):
                                   "_Questo comporta anche che non riceverai più alcuna notifica nel caso seguissi precedentemente qualche corso._")
     return ConversationHandler.END
 
-def stoplisten(update, context):
-    # TO DO
-    return ConversationHandler.END
+
+def notifications(update, context):
+    # If the user hasn't requested the list of the courses already, we get it using the unistudium framework
+    response = uni.reconnect(context.user_data)
+    if response != "OK":
+        # Error
+        update.message.reply_markdown(response, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+
+    # Check if the list of the courses is available
+    if 'courses' not in context.user_data:
+        context.user_data['courses'] = uni.get_courseslist(context.user_data)
+
+    # Send message with list of courses to the user
+    choose_course_view_files = 'Seleziona il corso di cui vuoi abilitare/disabilitare notifiche'
+    reply_keyboard = [["%s %s" % (context.user_data['courses'][course_name]['followed'], course_name)] for course_name in context.user_data['courses'].keys()]
+    update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+    
+    # Update pickle file
+    pp.flush()
+    
+    return 1
 
 
-def stoplisten_1(update, context):
+def notifications_1(update, context):
+    course_name = update.message.text[2:]
+
+    # Check for course name validity
+    try:
+        if context.user_data['courses'][course_name]['followed'] == '🔕':
+            context.user_data['courses'][course_name]['followed'] = '🔔'
+            update.message.reply_markdown('Riprenderai a ricevere le notifiche dal corso di ' + course_name, reply_markup=ReplyKeyboardRemove())
+        else:
+            context.user_data['courses'][course_name]['followed'] = '🔕'
+            update.message.reply_markdown('Non riceverai più notifiche dal corso di ' + course_name, reply_markup=ReplyKeyboardRemove())
+    except KeyError:
+        no_course = 'Non è presente un corso con quel nome, riprova.'
+        update.message.reply_text(no_course)
+        return 1
+
     # TO DO
     return ConversationHandler.END
 
@@ -160,7 +197,7 @@ def viewfiles(update, context):
 
     # Send message with list of courses to the user
     choose_course_view_files = 'Seleziona il corso di cui vuoi vedere i files caricati'
-    reply_keyboard = [[course_name] for course_name in context.user_data['courses'].keys()]
+    reply_keyboard = [["%s %s" % (context.user_data['courses'][course_name]['followed'], course_name)] for course_name in context.user_data['courses'].keys()]
     update.message.reply_text(choose_course_view_files, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
     
     # Update pickle file
@@ -170,7 +207,7 @@ def viewfiles(update, context):
 
 
 def viewfiles_1(update, context):
-    course_name = update.message.text
+    course_name = update.message.text[2:]
 
     # Check for course name validity
     try:
@@ -215,7 +252,7 @@ def viewnews(update, context):
 
     # Send message with list of courses to the user
     choose_course_view_news = 'Seleziona il corso di cui vuoi vedere le news caricate'
-    reply_keyboard = [[course_name] for course_name in context.user_data['courses'].keys()]
+    reply_keyboard = [["%s %s" % (context.user_data['courses'][course_name]['followed'], course_name)] for course_name in context.user_data['courses'].keys()]
     update.message.reply_text(choose_course_view_news, reply_markup=ReplyKeyboardMarkup(reply_keyboard))
 
     # Save in the pickle file
@@ -225,7 +262,7 @@ def viewnews(update, context):
 
 
 def viewnews_1(update, context):
-    course_name = update.message.text
+    course_name = update.message.text[2:]
 
     # Check for course name validity
     try:
@@ -243,7 +280,7 @@ def viewnews_1(update, context):
         update.message.reply_text(no_news, reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
 
-    # Save course selected ID for the next step
+    # Save course selected for the next step
     context.user_data['course_selected'] = course_name
 
     # Send message to the user
@@ -313,6 +350,10 @@ def listen(bot, upd_time):
                 pp.user_data[uid]['courses'] = uni.get_courseslist(pp.user_data[uid])
 
             for course in pp.user_data[uid]['courses']:
+                if pp.user_data[uid]['courses'][course]['followed'] == '🔕':
+                    # Skip this course for this user
+                    continue
+
                 # Get the most updated files list
                 new_files_list = uni.get_course_fileslist(pp.user_data[uid], pp.user_data[uid]['courses'][course]['url'])
                 
@@ -412,12 +453,11 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-
-    cmd_stoplisten = ConversationHandler(
-        entry_points=[CommandHandler('stoplisten', stoplisten)],
+    cmd_notifications = ConversationHandler(
+        entry_points=[CommandHandler('notifications', notifications)],
 
         states={
-            1: [MessageHandler(Filters.text, stoplisten_1)]
+            1: [MessageHandler(Filters.text, notifications_1)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
@@ -449,7 +489,7 @@ def main():
     dp.add_handler(CommandHandler('info', info))
     dp.add_handler(CommandHandler('logout', logout))
     dp.add_handler(cmd_login)
-    dp.add_handler(cmd_stoplisten)
+    dp.add_handler(cmd_notifications)
     dp.add_handler(cmd_viewfiles)
     dp.add_handler(cmd_viewnews)
     dp.add_handler(CommandHandler('cancel', cancel))
