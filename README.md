@@ -30,7 +30,13 @@ Una volta effettuato il clone della repository attraverso il comando git clone, 
 ```bash
 $ sudo pip install -r requirements.txt
 ```
-Dopodiché sarà necessario rinominare 2 files:
+
+Oppure nel caso non funzioni (se non si è su Windows ad esempio):
+```bash
+$ sudo pip3 install -r requirements.txt
+```
+
+Dopodiché sarà necessario rinominare il seguente file:
 * ``settings_dist.py`` in ``settings.py``,
 
 Il file ``settings.py`` contiene vari parametri che si potranno modificare secondo le proprie esigenze (per un uso facile e veloce, basterà modificare il TOKEN del bot con uno vostro generato tramite [BotFather](http://www.insidevcode.eu/2015/06/27/telegram-3-0-bot/)).
@@ -43,7 +49,7 @@ L'avvio del bot è molto semplice, basterà eseguire il seguente comando da bash
 $ python main.py
 ```
 
-Oppure nel caso non funzioni:
+Oppure nel caso non funzioni (se non si è su Windows ad esempio):
 ```bash
 $ python3 main.py
 ```
