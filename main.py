@@ -335,35 +335,39 @@ def callback_query(update, context):
     query.answer("Done")
 
 
-def listen(bot, upd_time):
+def listen(bot, dp, upd_time):
+    """
+    Listen for updates of files and news on Unistudium
+    """
     while True:
         print(Fore.CYAN + "Controllo per nuovi updates...")
 
-        for uid in pp.user_data:
+        for uid in dp.user_data:
             # Check if the server is online and the credentials are valid
-            response = uni.reconnect(pp.user_data[uid])
+            response = uni.reconnect(dp.user_data[uid])
             if response != "OK":
                 continue
 
             # Download courses list if it doesn't exist
-            if 'courses' not in pp.user_data[uid]:
-                pp.user_data[uid]['courses'] = uni.get_courseslist(pp.user_data[uid])
+            if 'courses' not in dp.user_data[uid]:
+                dp.user_data[uid]['courses'] = uni.get_courseslist(dp.user_data[uid])
+                pp.flush()
 
-            for course in pp.user_data[uid]['courses']:
-                if pp.user_data[uid]['courses'][course]['followed'] == '🔕':
+            for course in dp.user_data[uid]['courses']:
+                if dp.user_data[uid]['courses'][course]['followed'] == '🔕':
                     # Skip this course for this user
                     continue
 
                 # Get the most updated files list
-                new_files_list = uni.get_course_fileslist(pp.user_data[uid], pp.user_data[uid]['courses'][course]['url'])
+                new_files_list = uni.get_course_fileslist(dp.user_data[uid], dp.user_data[uid]['courses'][course]['url'])
                 
                 # Check if I don't have a previous version
-                if not 'fileslist' in pp.user_data[uid]['courses'][course]:
-                    pp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
+                if not 'fileslist' in dp.user_data[uid]['courses'][course]:
+                    dp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
                     pp.flush()
                     continue
                     
-                old_files_list = pp.user_data[uid]['courses'][course]['fileslist']
+                old_files_list = dp.user_data[uid]['courses'][course]['fileslist']
                 
                 # Find the differences between these two lists
                 def find_diff(first_list, second_list):
@@ -398,7 +402,7 @@ def listen(bot, upd_time):
                 # Notify all the users "registered" of the updates
                 if additions or removes:
                     # Update data
-                    pp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
+                    dp.user_data[uid]['courses'][course]['fileslist'] = new_files_list
                     pp.flush()
                     print(Fore.GREEN + "Ho trovato nuovi updates nel corso di %s (per uid: %d)" % (course, uid))
 
@@ -504,7 +508,7 @@ def main():
     print("Ready to work.")
 
     # Start the listener for new files in courses' page
-    listener = threading.Thread(target=listen, args=(updater.bot, UPD_TIME))
+    listener = threading.Thread(target=listen, args=(updater.bot, dp, UPD_TIME))
     listener.start()
     
     # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT.
