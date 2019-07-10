@@ -85,7 +85,11 @@ def login_1(update, context):
     # Save credentials
     context.user_data['credentials'] = {}
 
+    # Getting username and password from message's text
     user_pass = update.message.text.split(' ')
+
+    # Delete user message
+    context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=update.message.message_id)
 
     if len(user_pass) == 2:
         context.user_data['credentials']['username'], context.user_data['credentials']['password'] = user_pass
@@ -96,9 +100,6 @@ def login_1(update, context):
     # Send a message to the user to let him wait
     update.message.reply_text("Tentativo di connessione in corso, attendere...")
     context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=ChatAction.TYPING)
-
-    # Delete user message
-    context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=update.message.message_id)
 
     # Try login
     response = uni.reconnect(context.user_data)
@@ -176,7 +177,6 @@ def notifications_1(update, context):
         update.message.reply_text(no_course)
         return 1
 
-    # TO DO
     return ConversationHandler.END
 
 
@@ -343,6 +343,11 @@ def listen(bot, dp, upd_time):
         print(Fore.CYAN + "Controllo per nuovi updates...")
 
         for uid in dp.user_data:
+            # To Debug the listen function, uncomment carefully these lines
+            # del dp.user_data[uid]['courses']['INGEGNERIA DEL SOFTWARE (2018/19)']['fileslist'][0][1][3]
+            # dp.user_data[uid]['courses']['INGEGNERIA DEL SOFTWARE (2018/19)']['fileslist'][1][1] = []
+            # quit()
+
             # Check if the server is online and the credentials are valid
             response = uni.reconnect(dp.user_data[uid])
             if response != "OK":
